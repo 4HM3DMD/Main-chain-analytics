@@ -1,0 +1,587 @@
+## Full Plan: ELA Top 50 Wallet Tracker (Replit)
+
+---
+
+### Architecture
+
+```
+┌──────────────────── Replit (Always-On) ────────────────────┐
+│                                                             │
+│  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐  │
+│  │  node-cron   │───▶│   SQLite DB   │◀───│  Express API  │  │
+│  │ 3x per day   │    │  snapshots    │    │  /api/*       │  │
+│  │ fetches API   │    │  entries      │    │               │  │
+│  └──────┬───────┘    │  addresses    │    └───────┬───────┘  │
+│         │            └──────────────┘            │          │
+│         ▼                                        ▼          │
+│  ela.elastos.io/api/v1/richlist        React Frontend      │
+│  (external, no changes)                (Vite + Tailwind)   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Stack:** Node.js, Express, SQLite (better-sqlite3), node-cron, React, Vite, Tailwind CSS, Recharts
+
+**Snapshots:** 3x daily at 00:00, 08:00, 16:00 UTC
+
+---
+
+### Database Schema
+
+```
+snapshots
+├── id (INTEGER, PK)
+├── date (TEXT, "2026-02-06")
+├── time_slot (TEXT, "00:00" | "08:00" | "16:00")
+├── fetched_at (TEXT, ISO timestamp)
+├── total_balances (REAL)
+└── total_richlist (INTEGER)
+
+snapshot_entries
+├── id (INTEGER, PK)
+├── snapshot_id (INTEGER, FK → snapshots.id)
+├── rank (INTEGER)
+├── address (TEXT)
+├── balance (REAL)
+├── percentage (REAL)
+├── prev_rank (INTEGER, nullable — rank in previous snapshot)
+├── rank_change (INTEGER, nullable — positive = moved up)
+└── balance_change (REAL, nullable — diff from previous)
+
+address_labels
+├── address (TEXT, PK)
+├── label (TEXT)
+└── category (TEXT — "burn", "exchange", "pool", "dao", "sidechain")
+
+daily_summary
+├── id (INTEGER, PK)
+├── date (TEXT)
+├── new_entries (TEXT — JSON array of addresses that entered top 50)
+├── dropouts (TEXT — JSON array of addresses that left top 50)
+├── biggest_gainer_address (TEXT)
+├── biggest_gainer_change (REAL)
+├── biggest_loser_address (TEXT)
+└── biggest_loser_change (REAL)
+```
+
+---
+
+### API Endpoints (Express)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard` | Latest snapshot + stats + recent changes |
+| GET | `/api/snapshots` | List all snapshots (paginated) |
+| GET | `/api/snapshots/latest` | Latest snapshot with computed changes |
+| GET | `/api/snapshots/:id` | Specific snapshot by ID |
+| GET | `/api/compare?from=DATE&to=DATE` | Compare two dates side by side |
+| GET | `/api/address/:address` | Full history of an address (rank + balance over time) |
+| GET | `/api/movers?period=7d` | Biggest movers in period |
+| GET | `/api/new-entries?days=30` | Addresses that entered top 50 recently |
+| GET | `/api/dropouts?days=30` | Addresses that left top 50 recently |
+| GET | `/api/hall-of-fame` | All addresses that have ever been in top 50 |
+| POST | `/api/snapshots/trigger` | Manually trigger a snapshot (admin) |
+
+---
+
+### Frontend Pages
+
+| Page | Route | Content |
+|------|-------|---------|
+| **Dashboard** | `/` | Live top 50 with rank arrows, stats cards, latest changes |
+| **History** | `/history` | Calendar/timeline, click any date to view snapshot |
+| **Compare** | `/compare` | Select two dates, see side-by-side diff |
+| **Address** | `/address/:addr` | Rank chart, balance chart, appearances, in/out dates |
+| **Movers** | `/movers` | Biggest gainers/losers by period (24h, 7d, 30d) |
+| **Hall of Fame** | `/hall-of-fame` | Every address that ever appeared, total days in top 50 |
+
+---
+
+## Replit Prompts (Copy-Paste in Order)
+
+---
+
+### Prompt 1: Project Setup, Database, and Cron Job
+
+```
+Create a full-stack Node.js application with the following structure:
+
+PROJECT STRUCTURE:
+/server
+  /db
+    schema.js         — SQLite database setup with better-sqlite3
+    queries.js        — All database query functions
+  /services
+    fetcher.js        — Fetches richlist from external API
+    analyzer.js       — Computes rank changes, new entries, dropouts
+    scheduler.js      — node-cron jobs (3x daily)
+  /routes
+    api.js            — All Express API routes
+  index.js            — Express server entry point
+/client                — React frontend (set up later)
+/data                  — SQLite database file lives here
+package.json
+
+BACKEND REQUIREMENTS:
+
+1. DATABASE (better-sqlite3):
+Create these tables:
+
+- "snapshots": id (INTEGER PRIMARY KEY AUTOINCREMENT), date (TEXT not null), time_slot (TEXT not null, one of "00:00","08:00","16:00"), fetched_at (TEXT not null), total_balances (REAL), total_richlist (INTEGER). Add UNIQUE constraint on (date, time_slot).
+
+- "snapshot_entries": id (INTEGER PRIMARY KEY AUTOINCREMENT), snapshot_id (INTEGER REFERENCES snapshots(id)), rank (INTEGER not null), address (TEXT not null), balance (REAL not null), percentage (REAL), prev_rank (INTEGER), rank_change (INTEGER), balance_change (REAL). Index on (snapshot_id), index on (address).
+
+- "address_labels": address (TEXT PRIMARY KEY), label (TEXT not null), category (TEXT). Seed with these known addresses:
+  - ELANULLXXXXXXXXXXXXXXXXXXXXXYvs3rr = "Burn Address", category "burn"
+  - XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf = "ESC Sidechain Transfer", category "sidechain"
+  - STAKEPooLXXXXXXXXXXXXXXXXXXXpP1PQ2 = "Staking Pool", category "pool"
+  - CRASSETSXXXXXXXXXXXXXXXXXXXX2qDX5J = "DAO Assets (Locked)", category "dao"
+  - CREXPENSESXXXXXXXXXXXXXXXXXX4UdT6b = "DAO Expenses (Unlocked)", category "dao"
+  - STAKEREWARDXXXXXXXXXXXXXXXXXFD5SHU = "Staking Rewards Pool", category "pool"
+  - ENqof4f3bvpLLZVXMALUL4b8hDAJHAVxU6 = "F2Pool Mining", category "pool"
+  - EMRKTXN183vwcGbCetvKuUPHMyQScRjx6F = "Antpool Mining", category "pool"
+  - XV5cSp1y1PU4xXSQs5oaaLExgHA2xHYjp5 = "ECO Chain Transfer", category "sidechain"
+
+- "daily_summary": id (INTEGER PRIMARY KEY AUTOINCREMENT), date (TEXT UNIQUE not null), new_entries (TEXT — JSON string), dropouts (TEXT — JSON string), biggest_gainer_address (TEXT), biggest_gainer_change (REAL), biggest_loser_address (TEXT), biggest_loser_change (REAL).
+
+2. FETCHER SERVICE (fetcher.js):
+- Function fetchRichList() that calls GET https://ela.elastos.io/api/v1/richlist?page=1&pageSize=50
+- Returns the parsed JSON response
+- Has retry logic: 3 attempts with 5-second delay between retries
+- Timeout of 15 seconds per request
+- Logs success/failure with timestamps
+
+3. ANALYZER SERVICE (analyzer.js):
+- Function analyzeSnapshot(currentData, previousSnapshot):
+  - Takes the raw API response and the previous snapshot entries from the DB
+  - For each address in the current top 50:
+    - Find if it existed in the previous snapshot
+    - Calculate prev_rank (its rank in previous snapshot, or null if new)
+    - Calculate rank_change (prev_rank - current_rank, positive means moved UP)
+    - Calculate balance_change (current_balance - previous_balance)
+  - Identify new_entries: addresses in current but NOT in previous
+  - Identify dropouts: addresses in previous but NOT in current
+  - Find biggest_gainer: address with largest positive balance_change
+  - Find biggest_loser: address with largest negative balance_change
+  - Return all computed data
+
+4. SCHEDULER SERVICE (scheduler.js):
+- Use node-cron to schedule jobs at:
+  - "0 0 * * *" (00:00 UTC)
+  - "0 8 * * *" (08:00 UTC)
+  - "0 16 * * *" (16:00 UTC)
+- Each job:
+  a. Determines the current time_slot based on hour
+  b. Checks if snapshot already exists for today + time_slot (skip if yes)
+  c. Calls fetchRichList()
+  d. Gets the most recent previous snapshot from DB
+  e. Calls analyzeSnapshot() to compute changes
+  f. Inserts into snapshots table
+  g. Inserts all 50 entries into snapshot_entries with computed changes
+  h. Updates/inserts daily_summary
+  i. Logs everything
+- Also export a function triggerManualSnapshot() for the admin API endpoint
+
+5. EXPRESS SERVER (index.js):
+- Runs on port 3000
+- Serves the API routes under /api
+- Will later serve the React frontend static files
+- CORS enabled
+- JSON body parser
+- On startup: initialize database, start scheduler, log next scheduled times
+- Also trigger an immediate snapshot if the database is empty (first run)
+
+6. API ROUTES (api.js):
+Implement these endpoints:
+
+GET /api/dashboard
+- Returns: latest snapshot with entries (including labels), stats (total snapshots, days tracked, total unique addresses ever seen), last 5 daily summaries
+
+GET /api/snapshots?page=1&limit=20
+- Returns: paginated list of snapshots (id, date, time_slot, fetched_at) ordered by most recent
+
+GET /api/snapshots/latest
+- Returns: the most recent snapshot with all 50 entries, computed changes, and address labels
+
+GET /api/snapshots/:id
+- Returns: specific snapshot with all entries
+
+GET /api/compare?from=2026-02-01&to=2026-02-06
+- Finds the last snapshot of each date
+- Returns both snapshots side by side with a diff: who moved up, who moved down, new entries, dropouts, balance changes
+
+GET /api/address/:address
+- Returns: all snapshot_entries for this address across all snapshots, ordered by date
+- Include: label if exists, first_seen date, last_seen date, total appearances, best_rank, worst_rank, current_rank
+
+GET /api/movers?period=7d
+- period can be "24h", "7d", "30d"
+- Returns: top 10 biggest balance gainers and top 10 biggest balance losers in that period
+
+GET /api/new-entries?days=30
+- Returns: addresses that entered the top 50 in the last N days, with the date they entered and their entry rank
+
+GET /api/dropouts?days=30
+- Returns: addresses that left the top 50 in the last N days, with the date they left, their last rank, and their current balance if still trackable
+
+GET /api/hall-of-fame
+- Returns: every unique address that has EVER appeared in any snapshot, with: total_appearances (number of snapshots they were in), first_seen, last_seen, best_rank, current_status (in/out), label
+
+POST /api/snapshots/trigger
+- Manually triggers a snapshot right now
+- Returns the new snapshot data
+
+GET /api/health
+- Returns server uptime, database stats, next scheduled snapshot time, last snapshot time
+
+Make sure all error handling is robust. Use try/catch everywhere. Return proper HTTP status codes. Log errors to console with timestamps.
+```
+
+---
+
+### Prompt 2: React Frontend — Setup + Dashboard Page
+
+```
+Now add a React frontend to this project using Vite and Tailwind CSS.
+
+SETUP:
+- Create the React app in the /client directory
+- Use Vite as the build tool
+- Install and configure Tailwind CSS with a dark theme
+- Install react-router-dom for routing
+- Install recharts for charts
+- Install lucide-react for icons
+- Install axios for API calls
+- Install date-fns for date formatting
+
+Configure the Express server to:
+- In development: proxy API requests from Vite dev server to Express
+- In production: serve the built React app from /client/dist as static files
+
+DESIGN SYSTEM:
+- Dark theme with these colors:
+  - Background: #0a0e1a
+  - Cards: #111827 with subtle border #1e293b
+  - Primary accent: #3b82f6 (blue)
+  - Green for positive changes: #22c55e
+  - Red for negative changes: #ef4444
+  - Orange for warnings: #f59e0b
+  - Purple for special: #a855f7
+  - Text primary: #f1f5f9
+  - Text secondary: #94a3b8
+- Rounded corners (xl/2xl), subtle shadows, smooth transitions
+- Modern, clean, professional look — think Bloomberg terminal meets modern web
+
+LAYOUT:
+- Sidebar navigation (collapsible on mobile to hamburger menu)
+- Navigation items with icons:
+  - Dashboard (LayoutDashboard icon)
+  - History (Calendar icon)
+  - Compare (ArrowLeftRight icon)
+  - Movers (TrendingUp icon)
+  - Hall of Fame (Trophy icon)
+- Header bar with: app name "ELA Whale Tracker", last snapshot time, connection status dot, manual snapshot trigger button
+- Main content area
+
+DASHBOARD PAGE (route: /):
+This is the main page. It should have:
+
+1. STATS ROW (4 cards):
+   - "Tracking Since" — first snapshot date
+   - "Total Snapshots" — count
+   - "Unique Addresses" — ever seen in top 50
+   - "Last Updated" — relative time (e.g., "2 hours ago")
+
+2. LATEST CHANGES BANNER:
+   - If there are new entries or dropouts since last snapshot, show an alert-style banner:
+   - "🟢 2 new entries: EfS7... (+#47), Ekd... (+#50)"
+   - "🔴 2 dropped out: Xv3... (was #48), Emk... (was #50)"
+
+3. TOP 50 TABLE:
+   - Columns: Rank, Change, Address, Label, Balance (ELA), Balance Change, % of Supply
+   - Rank column: shows current rank number with medal icons for top 3 (🥇🥈🥉)
+   - Change column:
+     - Green up arrow + number if moved up (e.g., "↑ 3")
+     - Red down arrow + number if moved down (e.g., "↓ 2")  
+     - Gray dash if unchanged
+     - Green "NEW" badge if just entered
+     - No arrow if first snapshot (no data yet)
+   - Address column: truncated hash with copy button. If address has a label, show the label in a colored badge (yellow for burn, blue for sidechain, green for pool, purple for DAO) and show the truncated address below it in smaller text
+   - Balance: formatted with commas, show full precision on hover
+   - Balance Change: green +X.XX or red -X.XX since last snapshot
+   - % of Supply: small progress bar + percentage text
+   - Clicking any row navigates to /address/:address
+   - Table should be responsive — on mobile, hide less important columns
+
+4. DAILY SUMMARY CARDS (last 3 days):
+   - Each card shows: date, number of new entries, number of dropouts, biggest gainer (name + amount), biggest loser (name + amount)
+   - Cards in a horizontal scrollable row
+
+Fetch all data from /api/dashboard on page load. Show loading skeletons while loading. Show error state with retry button if API fails. Auto-refresh every 5 minutes.
+```
+
+---
+
+### Prompt 3: History + Compare Pages
+
+```
+Add two more pages to the React frontend:
+
+HISTORY PAGE (route: /history):
+
+1. CALENDAR VIEW:
+   - Show a monthly calendar grid (like GitHub contribution graph style)
+   - Each day that has snapshots is a colored dot (colored by how many snapshots that day: 1=light, 2=medium, 3=bright blue)
+   - Days without snapshots are gray/empty
+   - Month/year navigation arrows
+   - Clicking a day opens a modal or expands to show that day's snapshots
+
+2. SNAPSHOT LIST:
+   - Below the calendar, show a paginated list of all snapshots
+   - Each item shows: date, time slot, total top-50 balance, number of changes from previous
+   - Clicking any snapshot opens a detailed view (same table format as dashboard but for that specific snapshot)
+   - Infinite scroll or "Load More" pagination
+
+3. SNAPSHOT DETAIL VIEW:
+   - When a snapshot is selected, show the full top 50 table for that moment in time
+   - Show all the rank changes and balance changes compared to the snapshot before it
+   - "Compare with today" button that navigates to /compare with dates pre-filled
+
+COMPARE PAGE (route: /compare):
+
+1. DATE SELECTOR:
+   - Two date picker inputs: "From" and "To"
+   - Default: "From" = 7 days ago, "To" = today
+   - Quick select buttons: "Yesterday vs Today", "Last Week", "Last Month"
+   - "Swap" button to flip the dates
+
+2. COMPARISON VIEW:
+   - Split into sections:
+
+   a. SUMMARY STATS:
+      - Cards showing: total balance change, addresses that moved up, addresses that moved down, new entries count, dropout count
+
+   b. SIDE-BY-SIDE TABLE:
+      - Show addresses that appear in EITHER snapshot
+      - Columns: Rank (From), Rank (To), Change, Address/Label, Balance (From), Balance (To), Balance Diff
+      - Sort by: biggest rank change (default), or by rank, or by balance change
+      - Color coding: green row highlight for new entries, red for dropouts, white for unchanged, light blue for moved up, light orange for moved down
+
+   c. NEW ENTRIES SECTION:
+      - Cards for each address that entered the top 50 between the two dates
+      - Show: address, entry rank, balance at entry
+
+   d. DROPOUTS SECTION:
+      - Cards for each address that left the top 50 between the two dates
+      - Show: address, last rank, last known balance
+
+Fetch data from /api/compare?from=DATE&to=DATE. Show loading states. Handle edge cases (same date selected, no data for date, etc.).
+```
+
+---
+
+### Prompt 4: Address Detail + Movers + Hall of Fame Pages
+
+```
+Add three more pages to the React frontend:
+
+ADDRESS DETAIL PAGE (route: /address/:address):
+
+1. HEADER:
+   - Full address with copy button
+   - Label badge if it has one (with category color)
+   - Current status: "Currently #X in Top 50" (green) or "Not currently in Top 50" (gray)
+   - First seen date, last seen date, total appearances count
+
+2. RANK HISTORY CHART (recharts):
+   - Line chart showing rank over time (Y-axis INVERTED so #1 is at top)
+   - X-axis: dates
+   - Tooltip showing exact rank and date on hover
+   - If address dropped out temporarily, show gaps in the line
+   - Chart should be responsive
+
+3. BALANCE HISTORY CHART (recharts):
+   - Area chart showing balance over time
+   - X-axis: dates
+   - Tooltip showing exact balance on hover
+   - Green fill if trending up overall, red if trending down
+
+4. STATS CARDS:
+   - Best rank ever achieved (with date)
+   - Worst rank while in top 50 (with date)
+   - Highest balance (with date)
+   - Lowest balance while in top 50 (with date)
+   - Average rank
+   - Total days in top 50
+
+5. APPEARANCE LOG:
+   - Table showing every snapshot this address appeared in
+   - Columns: Date, Time, Rank, Balance, Change from Previous
+   - Paginated, most recent first
+
+MOVERS PAGE (route: /movers):
+
+1. PERIOD SELECTOR:
+   - Toggle buttons: "24 Hours", "7 Days", "30 Days"
+
+2. BIGGEST GAINERS (left column or top section):
+   - Top 10 addresses with largest POSITIVE balance change in the selected period
+   - Each card shows: rank, address/label, balance change (+X,XXX ELA), percentage change, rank movement
+   - Bar chart visualization of the gains
+
+3. BIGGEST LOSERS (right column or bottom section):
+   - Top 10 addresses with largest NEGATIVE balance change in the selected period
+   - Same format as gainers but with red color scheme
+   - Bar chart visualization of the losses
+
+4. RANK MOVERS:
+   - Top 5 addresses that moved up the most ranks
+   - Top 5 addresses that moved down the most ranks
+   - Show: address, from rank, to rank, arrow with change number
+
+HALL OF FAME PAGE (route: /hall-of-fame):
+
+1. STATS BANNER:
+   - Total unique addresses ever tracked
+   - Currently in top 50 count
+   - Longest streak (most consecutive days in top 50)
+
+2. FULL TABLE:
+   - Every address that has EVER appeared in any snapshot
+   - Columns: Address/Label, Total Appearances, First Seen, Last Seen, Best Rank, Current Status (green "Active" badge or gray "Inactive" badge), Days in Top 50
+   - Sortable by any column
+   - Search/filter bar to find specific addresses
+   - Filter toggles: "Show Active Only", "Show Inactive Only", "Show All"
+
+3. Category breakdown:
+   - Pie chart showing how many addresses are: burn, pool, dao, sidechain, unknown/regular
+   - Click a category to filter the table
+
+Fetch data from the respective API endpoints. Loading states and error handling for all pages.
+```
+
+---
+
+### Prompt 5: Polish, Mobile, and Edge Cases
+
+```
+Polish the entire application for production readiness:
+
+1. MOBILE RESPONSIVENESS:
+   - Sidebar collapses to bottom tab bar on mobile (like a mobile app)
+   - Tables become card-based layouts on mobile (each row becomes a card)
+   - Charts resize properly on small screens
+   - Touch-friendly tap targets (minimum 44px)
+   - Swipe gestures on the compare page to switch between dates
+
+2. LOADING STATES:
+   - Skeleton loaders for every component that fetches data (not just spinners)
+   - Skeleton should match the shape of the actual content
+   - Smooth fade-in transition when data loads
+
+3. ERROR HANDLING:
+   - If API is unreachable, show a clear error with retry button
+   - If a specific snapshot doesn't exist, show "No data for this date"
+   - If the database is empty (first run), show an onboarding message: "Welcome! Your first snapshot will be taken shortly. You can also trigger one manually."
+   - Toast notifications for: successful manual snapshot, failed snapshot, etc.
+
+4. EMPTY STATES:
+   - Each page should have a meaningful empty state illustration/message
+   - Dashboard with no data: "No snapshots yet. Click 'Take Snapshot' to start tracking."
+   - Compare with no data: "Select two dates to compare"
+   - Address with no history: "This address has no recorded history yet"
+
+5. AUTO-REFRESH:
+   - Dashboard auto-refreshes data every 5 minutes
+   - Show a subtle "Last updated: X minutes ago" indicator
+   - When new data arrives, smoothly animate the changes (rank arrows slide, numbers count up/down)
+
+6. PERFORMANCE:
+   - Virtualize long lists (if more than 100 items)
+   - Lazy load charts (only render when visible)
+   - Cache API responses for 60 seconds on the client side
+   - Debounce search inputs
+
+7. HEADER IMPROVEMENTS:
+   - Show a pulsing green dot when the cron job is active
+   - Show countdown to next snapshot: "Next snapshot in 2h 34m"
+   - Manual snapshot button with confirmation dialog and cooldown (prevent spam, minimum 1 hour between manual snapshots)
+
+8. ACCESSIBILITY:
+   - Proper ARIA labels on all interactive elements
+   - Keyboard navigation for tables and modals
+   - Color-blind friendly: use icons/shapes in addition to colors for up/down indicators
+   - Focus indicators on all focusable elements
+
+9. SEO / META:
+   - Page titles for each route (e.g., "Dashboard | ELA Whale Tracker")
+   - Meta descriptions
+   - Open Graph tags for link previews
+
+10. FOOTER:
+    - "Powered by Elastos Blockchain"
+    - Link to ela.elastos.io
+    - "Data refreshed 3x daily"
+    - Version number
+
+Make sure the Express server properly serves the built React app in production mode. Add a build script that builds the React app and starts the server. Make sure the Replit "Run" button works correctly.
+```
+
+---
+
+### Prompt 6 (Optional): Notifications + Export
+
+```
+Add these bonus features:
+
+1. DATA EXPORT:
+   - Button on dashboard to export current top 50 as CSV
+   - Button on compare page to export comparison as CSV
+   - Button on address page to export address history as CSV
+   - Each CSV should have proper headers and formatted data
+
+2. SNAPSHOT LOG PAGE (route: /logs):
+   - Show a real-time log of all cron job activity
+   - Each entry: timestamp, action (fetch/analyze/save), status (success/fail), duration, details
+   - Store logs in a "logs" table in SQLite
+   - Max 500 log entries (auto-prune oldest)
+   - Show overall health: success rate, average fetch time, last failure details
+
+3. SETTINGS PAGE (route: /settings):
+   - Toggle: enable/disable each time slot (00:00, 08:00, 16:00)
+   - Button: manually add an address label (address + label + category dropdown)
+   - Button: trigger manual snapshot
+   - Button: export entire database as JSON backup
+   - Button: import database from JSON backup
+   - Show database size and snapshot count
+
+4. SEARCH:
+   - Global search bar in the header
+   - Searches across: address hashes, address labels
+   - Shows instant results dropdown as you type
+   - Press enter or click result to navigate to /address/:address
+```
+
+---
+
+### Running Order
+
+| Step | Prompt | What It Builds | Test |
+|------|--------|----------------|------|
+| 1 | Prompt 1 | Backend + DB + Cron | Hit `/api/health`, trigger `/api/snapshots/trigger`, verify data in DB |
+| 2 | Prompt 2 | Frontend setup + Dashboard | See the dashboard with live data |
+| 3 | Prompt 3 | History + Compare | Navigate between snapshots, compare dates |
+| 4 | Prompt 4 | Address + Movers + Hall of Fame | Click addresses, check charts render |
+| 5 | Prompt 5 | Polish everything | Test on mobile, check loading states |
+| 6 | Prompt 6 | Bonus features | Export CSV, check logs |
+
+---
+
+### Important Replit Tips
+
+- **Always-On**: Enable "Always On" in Replit (paid feature) so the cron jobs keep running even when you close the browser. Without it, the server stops when you leave.
+- **If no Always-On**: Use an external pinger like UptimeRobot (free) to ping your Replit URL every 5 minutes to keep it awake.
+- **Database persistence**: SQLite file in `/data/` persists on Replit's filesystem across restarts.
+- **First run**: After Prompt 1, trigger a manual snapshot via the API to seed your first data point. The cron will handle the rest.
+- **Backup**: Periodically download the SQLite file from Replit as a backup.
+
+After all 6 prompts, you'll have a fully self-sustaining whale tracker that runs 24/7 on Replit, takes 3 snapshots per day, and gives you a rich analytics dashboard — all without touching the ELA backend.

@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy } from "lucide-react";
+import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +15,7 @@ import {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Flows", url: "/flows", icon: Activity },
   { title: "History", url: "/history", icon: Calendar },
   { title: "Compare", url: "/compare", icon: ArrowLeftRight },
   { title: "Movers", url: "/movers", icon: TrendingUp },
@@ -64,7 +65,7 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         <div className="text-xs text-muted-foreground space-y-1">
           <p>Powered by Elastos Blockchain</p>
-          <p>Data refreshed 3x daily</p>
+          <p>Snapshots every 2 hours</p>
         </div>
       </SidebarFooter>
     </Sidebar>

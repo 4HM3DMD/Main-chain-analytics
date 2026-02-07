@@ -201,6 +201,87 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/flows", async (req, res) => {
+    try {
+      const latestSnapshot = await storage.getLatestSnapshot();
+      if (!latestSnapshot) return res.status(404).json({ message: "No snapshots available" });
+
+      const entries = await storage.getEntriesWithLabels(latestSnapshot.id);
+
+      const totalBalance = entries.reduce((sum, e) => sum + e.balance, 0);
+      const top10Balance = entries.slice(0, 10).reduce((sum, e) => sum + e.balance, 0);
+      const top20Balance = entries.slice(0, 20).reduce((sum, e) => sum + e.balance, 0);
+      const top50Balance = totalBalance;
+
+      const concentration = {
+        top10: { balance: top10Balance, percentage: totalBalance > 0 ? (top10Balance / totalBalance) * 100 : 0 },
+        top20: { balance: top20Balance, percentage: totalBalance > 0 ? (top20Balance / totalBalance) * 100 : 0 },
+        top50: { balance: top50Balance, percentage: 100 },
+      };
+
+      const categoryMap = new Map<string, { balance: number; count: number; addresses: string[] }>();
+      for (const e of entries) {
+        const cat = e.category || "unknown";
+        if (!categoryMap.has(cat)) categoryMap.set(cat, { balance: 0, count: 0, addresses: [] });
+        const c = categoryMap.get(cat)!;
+        c.balance += e.balance;
+        c.count += 1;
+        c.addresses.push(e.address);
+      }
+
+      const categoryBreakdown = Array.from(categoryMap.entries()).map(([cat, data]) => ({
+        category: cat,
+        balance: data.balance,
+        count: data.count,
+        percentage: totalBalance > 0 ? (data.balance / totalBalance) * 100 : 0,
+      })).sort((a, b) => b.balance - a.balance);
+
+      const allSnapshots = await storage.getSnapshots(1, 100);
+      const flowTrend: Array<{ date: string; timeSlot: string; totalBalance: number; top10Balance: number; top20Balance: number }> = [];
+
+      const snapshotsToProcess = allSnapshots.snapshots.slice(0, 50).reverse();
+      for (const snap of snapshotsToProcess) {
+        const snapEntries = await storage.getEntriesBySnapshotId(snap.id);
+        const total = snapEntries.reduce((s, e) => s + e.balance, 0);
+        const t10 = snapEntries.slice(0, 10).reduce((s, e) => s + e.balance, 0);
+        const t20 = snapEntries.slice(0, 20).reduce((s, e) => s + e.balance, 0);
+        flowTrend.push({
+          date: snap.date,
+          timeSlot: snap.timeSlot,
+          totalBalance: total,
+          top10Balance: t10,
+          top20Balance: t20,
+        });
+      }
+
+      const significantMovements = entries
+        .filter(e => e.balanceChange !== null && Math.abs(e.balanceChange) > 1000)
+        .map(e => ({
+          address: e.address,
+          label: e.label,
+          category: e.category,
+          rank: e.rank,
+          balance: e.balance,
+          balanceChange: e.balanceChange,
+          rankChange: e.rankChange,
+        }))
+        .sort((a, b) => Math.abs(b.balanceChange!) - Math.abs(a.balanceChange!));
+
+      res.json({
+        snapshotDate: latestSnapshot.date,
+        snapshotTime: latestSnapshot.timeSlot,
+        concentration,
+        categoryBreakdown,
+        flowTrend,
+        significantMovements,
+        totalBalance,
+      });
+    } catch (err: any) {
+      log(`Flows error: ${err.message}`, "api");
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/snapshots/trigger", async (_req, res) => {
     try {
       const snapshot = await triggerManualSnapshot();

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, RefreshCw } from "lucide-react";
 
 import Dashboard from "@/pages/dashboard";
+import Flows from "@/pages/flows";
 import History from "@/pages/history";
 import Compare from "@/pages/compare";
 import AddressDetail from "@/pages/address-detail";
@@ -25,6 +26,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/flows" component={Flows} />
       <Route path="/history" component={History} />
       <Route path="/compare" component={Compare} />
       <Route path="/address/:address" component={AddressDetail} />

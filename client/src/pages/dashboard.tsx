@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
 import { RankBadge, RankMedal } from "@/components/rank-badge";
 import { AddressDisplay } from "@/components/address-display";
-import { formatBalance, formatBalanceChange, formatPercentage, timeAgo } from "@/lib/utils";
+import { formatBalance, formatBalanceChange, formatPercentage, timeAgo, truncateAddress } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -128,26 +128,42 @@ export default function Dashboard() {
   const newEntries = dashboard.summaries?.[0]?.newEntries ? JSON.parse(dashboard.summaries[0].newEntries) : [];
   const dropouts = dashboard.summaries?.[0]?.dropouts ? JSON.parse(dashboard.summaries[0].dropouts) : [];
 
+  const totalBalance = dashboard.entries.reduce((s, e) => s + e.balance, 0);
+  const top10Balance = dashboard.entries.slice(0, 10).reduce((s, e) => s + e.balance, 0);
+  const top10Pct = totalBalance > 0 ? ((top10Balance / totalBalance) * 100).toFixed(1) : "0";
+
+  const significantMovers = dashboard.entries.filter(
+    (e) => e.balanceChange !== null && Math.abs(e.balanceChange) > 1000
+  ).sort((a, b) => Math.abs(b.balanceChange!) - Math.abs(a.balanceChange!)).slice(0, 5);
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
-          title="Tracking Since"
-          value={dashboard.stats.firstSnapshotDate || "—"}
-          icon={Clock}
+          title="Top 50 Balance"
+          value={`${(totalBalance / 1000000).toFixed(2)}M`}
+          subtitle="Total ELA in top 50"
+          icon={Wallet}
           iconColor="text-blue-400"
+        />
+        <StatCard
+          title="Top 10 Share"
+          value={`${top10Pct}%`}
+          subtitle={`${formatBalance(top10Balance)} ELA`}
+          icon={TrendingUp}
+          iconColor="text-emerald-400"
         />
         <StatCard
           title="Total Snapshots"
           value={dashboard.stats.totalSnapshots}
           icon={Camera}
-          iconColor="text-emerald-400"
+          iconColor="text-purple-400"
         />
         <StatCard
           title="Unique Addresses"
           value={dashboard.stats.uniqueAddresses}
           icon={Users}
-          iconColor="text-purple-400"
+          iconColor="text-orange-400"
         />
         <StatCard
           title="Last Updated"
@@ -183,6 +199,46 @@ export default function Dashboard() {
                 </span>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {significantMovers.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              Movement Alerts
+            </CardTitle>
+            <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
+              {significantMovers.length} alerts
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {significantMovers.map((m) => (
+              <Link key={m.address} href={`/address/${m.address}`}>
+                <div className="flex items-center justify-between gap-3 p-2 rounded-md hover-elevate" data-testid={`alert-mover-${m.rank}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-mono text-muted-foreground">#{m.rank}</span>
+                    {m.label ? (
+                      <span className="text-xs truncate">{m.label}</span>
+                    ) : (
+                      <span className="text-xs font-mono truncate text-muted-foreground">{truncateAddress(m.address, 6)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {m.balanceChange! > 0 ? (
+                      <TrendingUp className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <TrendingDown className="w-3 h-3 text-red-400" />
+                    )}
+                    <span className={`text-xs font-mono ${m.balanceChange! > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {formatBalanceChange(m.balanceChange!)}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </CardContent>
         </Card>
       )}

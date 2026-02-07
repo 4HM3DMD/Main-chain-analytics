@@ -1,16 +1,17 @@
 # ELA Whale Tracker
 
 ## Overview
-A full-stack application that tracks the top 50 richest Elastos (ELA) wallets. Takes automated snapshots 3x daily (00:00, 08:00, 16:00 UTC) from the Elastos blockchain API and provides analytics, comparison, and historical tracking.
+A full-stack application that tracks the top 50 richest Elastos (ELA) wallets. Takes automated snapshots every 2 hours from the Elastos blockchain API and provides analytics, flow analysis, comparison, and historical tracking.
 
 ## Architecture
 - **Frontend**: React + Vite + Tailwind CSS + Recharts
 - **Backend**: Express.js with PostgreSQL (Drizzle ORM)
-- **Scheduler**: node-cron for automated 3x daily snapshots
+- **Scheduler**: node-cron for snapshots every 2 hours (12x daily)
 - **External API**: https://ela.elastos.io/api/v1/richlist
 
 ## Key Pages
-- `/` - Dashboard: Live top 50 with stats, rank changes, balance changes
+- `/` - Dashboard: Live top 50 with stats, concentration metrics, movement alerts
+- `/flows` - Flow Analysis: Where is ELA going? Category breakdown, concentration, trends
 - `/history` - Calendar view of historical snapshots
 - `/compare` - Side-by-side date comparison
 - `/address/:addr` - Individual address detail with charts
@@ -20,7 +21,7 @@ A full-stack application that tracks the top 50 richest Elastos (ELA) wallets. T
 ## Project Structure
 ```
 client/src/
-  pages/          - All page components (dashboard, history, compare, etc.)
+  pages/          - All page components (dashboard, flows, history, compare, etc.)
   components/     - Reusable components (sidebar, stat-card, rank-badge, etc.)
   lib/            - Utilities, theme provider, query client
 
@@ -31,7 +32,7 @@ server/
   services/
     fetcher.ts    - Richlist API fetcher with retry logic
     analyzer.ts   - Snapshot analysis (rank/balance changes)
-    scheduler.ts  - Cron job scheduler
+    scheduler.ts  - Cron job scheduler (every 2 hours)
     seed-labels.ts - Known address labels seeding
 
 shared/
@@ -40,6 +41,7 @@ shared/
 
 ## API Endpoints
 - GET /api/dashboard - Latest snapshot + stats
+- GET /api/flows - Flow analysis (concentration, categories, trends, movements)
 - GET /api/snapshots - Paginated snapshot list
 - GET /api/snapshots/:id - Snapshot detail
 - GET /api/compare?from=&to= - Compare two dates
@@ -51,5 +53,8 @@ shared/
 
 ## Recent Changes
 - 2026-02-06: Initial build with full frontend (6 pages) and backend
+- 2026-02-06: Added Flows page with category breakdown pie charts, concentration analysis, balance trends
+- 2026-02-06: Increased snapshot frequency from 3x daily to every 2 hours
+- 2026-02-06: Added movement alerts and concentration stat cards to dashboard
 - Dark theme with Inter + JetBrains Mono fonts
 - Real-time data from Elastos blockchain API

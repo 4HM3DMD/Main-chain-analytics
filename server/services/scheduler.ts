@@ -6,9 +6,8 @@ import { log } from "../index";
 
 function getCurrentTimeSlot(): string {
   const hour = new Date().getUTCHours();
-  if (hour < 8) return "00:00";
-  if (hour < 16) return "08:00";
-  return "16:00";
+  const slotHour = Math.floor(hour / 2) * 2;
+  return `${slotHour.toString().padStart(2, "0")}:00`;
 }
 
 function getTodayDate(): string {
@@ -75,11 +74,9 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
 }
 
 export function startScheduler(): void {
-  cron.schedule("0 0 * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
-  cron.schedule("0 8 * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
-  cron.schedule("0 16 * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
+  cron.schedule("0 */2 * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
 
-  log("Scheduler started: snapshots at 00:00, 08:00, 16:00 UTC", "scheduler");
+  log("Scheduler started: snapshots every 2 hours UTC (00, 02, 04, ..., 22)", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {

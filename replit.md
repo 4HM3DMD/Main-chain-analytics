@@ -1,7 +1,7 @@
 # ELA Whale Tracker
 
 ## Overview
-A full-stack application that tracks the top 50 richest Elastos (ELA) wallets. Takes automated snapshots every 2 hours from the Elastos blockchain API and provides analytics, flow analysis, comparison, and historical tracking.
+A full-stack application that tracks the top 100 richest Elastos (ELA) wallets. Takes automated snapshots every 2 hours from the Elastos blockchain API and provides analytics, flow analysis, comparison, and historical tracking. ELA total circulating supply is ~28.22M with the Elastos API reporting totalBalances across all addresses.
 
 ## Architecture
 - **Frontend**: React + Vite + Tailwind CSS + Recharts
@@ -10,7 +10,7 @@ A full-stack application that tracks the top 50 richest Elastos (ELA) wallets. T
 - **External API**: https://ela.elastos.io/api/v1/richlist
 
 ## Key Pages
-- `/` - Dashboard: Live top 50 with stats, concentration metrics, movement alerts
+- `/` - Dashboard: Live top 100 with stats, concentration metrics, movement alerts
 - `/flows` - Flow Analysis: Where is ELA going? Category breakdown, concentration, trends
 - `/history` - Calendar view of historical snapshots
 - `/compare` - Side-by-side date comparison
@@ -56,5 +56,8 @@ shared/
 - 2026-02-06: Added Flows page with category breakdown pie charts, concentration analysis, balance trends
 - 2026-02-06: Increased snapshot frequency from 3x daily to every 2 hours
 - 2026-02-06: Added movement alerts and concentration stat cards to dashboard
+- 2026-02-07: Expanded tracking from top 50 to top 100 wallets
+- 2026-02-07: Fetcher now returns totalBalances from Elastos API for full supply context
 - Dark theme with Inter + JetBrains Mono fonts
 - Real-time data from Elastos blockchain API
+- ELA API: https://ela.elastos.io/api/v1/richlist?page=1&pageSize=100 (returns richlist[], totalBalances, totalRichlist)

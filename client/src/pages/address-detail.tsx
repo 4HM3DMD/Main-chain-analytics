@@ -94,7 +94,7 @@ export default function AddressDetail() {
             </Badge>
           ) : (
             <Badge variant="outline" className="text-muted-foreground no-default-hover-elevate no-default-active-elevate">
-              Not in Top 50
+              Not in Top 100
             </Badge>
           )}
         </div>

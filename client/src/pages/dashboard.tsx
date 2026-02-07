@@ -106,7 +106,7 @@ export default function Dashboard() {
           <Database className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-lg font-semibold mb-2">Welcome to ELA Whale Tracker</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            No snapshots yet. Click the button below to take your first snapshot and start tracking the top 50 ELA wallets.
+            No snapshots yet. Click the button below to take your first snapshot and start tracking the top 100 ELA wallets.
           </p>
           <Button
             onClick={() => triggerMutation.mutate()}
@@ -140,9 +140,9 @@ export default function Dashboard() {
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
-          title="Top 50 Balance"
+          title="Top 100 Balance"
           value={`${(totalBalance / 1000000).toFixed(2)}M`}
-          subtitle="Total ELA in top 50"
+          subtitle="Total ELA in top 100"
           icon={Wallet}
           iconColor="text-blue-400"
         />
@@ -245,7 +245,7 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-          <CardTitle className="text-base">Top 50 Wallets</CardTitle>
+          <CardTitle className="text-base">Top 100 Wallets</CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
               {dashboard.entries.length} wallets

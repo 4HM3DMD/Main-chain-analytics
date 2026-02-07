@@ -211,12 +211,12 @@ export async function registerRoutes(
       const totalBalance = entries.reduce((sum, e) => sum + e.balance, 0);
       const top10Balance = entries.slice(0, 10).reduce((sum, e) => sum + e.balance, 0);
       const top20Balance = entries.slice(0, 20).reduce((sum, e) => sum + e.balance, 0);
-      const top50Balance = totalBalance;
+      const top100Balance = totalBalance;
 
       const concentration = {
         top10: { balance: top10Balance, percentage: totalBalance > 0 ? (top10Balance / totalBalance) * 100 : 0 },
         top20: { balance: top20Balance, percentage: totalBalance > 0 ? (top20Balance / totalBalance) * 100 : 0 },
-        top50: { balance: top50Balance, percentage: 100 },
+        top100: { balance: top100Balance, percentage: 100 },
       };
 
       const categoryMap = new Map<string, { balance: number; count: number; addresses: string[] }>();

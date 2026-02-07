@@ -63,14 +63,14 @@ export function analyzeSnapshot(
     };
   });
 
-  for (const addr of prevAddresses) {
+  prevAddresses.forEach((addr) => {
     if (!currentAddresses.has(addr)) {
       dropouts.push(addr);
     }
-  }
+  });
 
-  if (biggestGainer && biggestGainer.change <= 0) biggestGainer = null;
-  if (biggestLoser && biggestLoser.change >= 0) biggestLoser = null;
+  if (biggestGainer && (biggestGainer as { address: string; change: number }).change <= 0) biggestGainer = null;
+  if (biggestLoser && (biggestLoser as { address: string; change: number }).change >= 0) biggestLoser = null;
 
   return { entries, newEntries, dropouts, biggestGainer, biggestLoser, totalBalance };
 }

@@ -33,7 +33,7 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
       }
     }
 
-    const richList = await fetchRichList();
+    const fetchResult = await fetchRichList();
 
     const prevSnapshot = await storage.getLatestSnapshot();
     const prevEntries = prevSnapshot
@@ -44,15 +44,14 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
       date,
       timeSlot,
       fetchedAt: new Date().toISOString(),
-      totalBalances: 0,
-      totalRichlist: richList.length,
+      totalBalances: fetchResult.totalBalances,
+      totalRichlist: fetchResult.richlist.length,
     });
 
-    const analysis = analyzeSnapshot(richList, prevEntries, tempSnapshot.id);
+    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, tempSnapshot.id);
 
     await storage.insertSnapshotEntries(analysis.entries);
-    await storage.updateSnapshotTotalBalances(tempSnapshot.id, analysis.totalBalance);
-    const snapshot = { ...tempSnapshot, totalBalances: analysis.totalBalance };
+    const snapshot = { ...tempSnapshot, totalBalances: fetchResult.totalBalances };
 
     await storage.upsertDailySummary({
       date,

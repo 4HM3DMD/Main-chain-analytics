@@ -16,7 +16,7 @@ interface FlowsData {
   concentration: {
     top10: { balance: number; percentage: number };
     top20: { balance: number; percentage: number };
-    top50: { balance: number; percentage: number };
+    top100: { balance: number; percentage: number };
   };
   categoryBreakdown: Array<{
     category: string;
@@ -88,7 +88,7 @@ export default function Flows() {
   const concentrationData = [
     { name: "Top 10", percentage: data.concentration.top10.percentage, balance: data.concentration.top10.balance },
     { name: "Top 11-20", percentage: data.concentration.top20.percentage - data.concentration.top10.percentage, balance: data.concentration.top20.balance - data.concentration.top10.balance },
-    { name: "Top 21-50", percentage: 100 - data.concentration.top20.percentage, balance: data.concentration.top50.balance - data.concentration.top20.balance },
+    { name: "Top 21-100", percentage: 100 - data.concentration.top20.percentage, balance: data.concentration.top100.balance - data.concentration.top20.balance },
   ];
 
   const concentrationPieData = concentrationData.map((d, i) => ({
@@ -126,11 +126,11 @@ export default function Flows() {
             <p className="text-xs text-muted-foreground mt-1">{formatBalance(data.concentration.top20.balance)} ELA</p>
           </CardContent>
         </Card>
-        <Card data-testid="card-concentration-top50">
+        <Card data-testid="card-concentration-top100">
           <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Top 50 Wallets</p>
+            <p className="text-xs text-muted-foreground mb-1">Top 100 Wallets</p>
             <p className="text-2xl font-bold font-mono">{formatBalance(data.totalBalance)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Total ELA in top 50</p>
+            <p className="text-xs text-muted-foreground mt-1">Total ELA in top 100</p>
           </CardContent>
         </Card>
       </div>
@@ -269,7 +269,7 @@ export default function Flows() {
                 <Area
                   type="monotone"
                   dataKey="totalBalance"
-                  name="Top 50"
+                  name="Top 100"
                   stroke="#6b7280"
                   fill="#6b7280"
                   fillOpacity={0.1}

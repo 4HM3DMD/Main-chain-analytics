@@ -12,7 +12,12 @@ interface RichListResponse {
   totalBalances: string;
 }
 
-export async function fetchRichList(): Promise<RichListItem[]> {
+export interface FetchResult {
+  richlist: RichListItem[];
+  totalBalances: number;
+}
+
+export async function fetchRichList(): Promise<FetchResult> {
   const maxRetries = 3;
   const retryDelay = 5000;
   const timeout = 15000;
@@ -25,7 +30,7 @@ export async function fetchRichList(): Promise<RichListItem[]> {
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
       const response = await fetch(
-        "https://ela.elastos.io/api/v1/richlist?page=1&pageSize=50",
+        "https://ela.elastos.io/api/v1/richlist?page=1&pageSize=100",
         { signal: controller.signal }
       );
 
@@ -42,7 +47,10 @@ export async function fetchRichList(): Promise<RichListItem[]> {
       }
 
       log(`Successfully fetched ${data.richlist.length} addresses`, "fetcher");
-      return data.richlist;
+      return {
+        richlist: data.richlist,
+        totalBalances: parseFloat(data.totalBalances) || 0,
+      };
     } catch (error: any) {
       log(`Attempt ${attempt} failed: ${error.message}`, "fetcher");
 

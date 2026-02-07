@@ -35,7 +35,7 @@ export function AppSidebar() {
             </div>
             <div>
               <h1 className="text-sm font-semibold leading-tight">ELA Whale Tracker</h1>
-              <p className="text-xs text-muted-foreground leading-tight">Top 50 Wallets</p>
+              <p className="text-xs text-muted-foreground leading-tight">Top 100 Wallets</p>
             </div>
           </div>
         </Link>

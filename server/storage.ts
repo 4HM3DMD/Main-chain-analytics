@@ -34,6 +34,7 @@ export interface IStorage {
   getDailySummaryByDate(date: string): Promise<DailySummary | undefined>;
 
   getMovers(fromDate: string, toDate: string): Promise<{ gainers: any[]; losers: any[] }>;
+  searchAddresses(query: string): Promise<any[]>;
   getHallOfFame(): Promise<any[]>;
   getCompareData(fromDate: string, toDate: string): Promise<any>;
 }
@@ -197,10 +198,10 @@ export class DatabaseStorage implements IStorage {
     const fromMap = new Map(fromEntries.map(e => [e.address, e]));
     const toMap = new Map(toEntries.map(e => [e.address, e]));
 
-    const allAddresses = new Set([...fromMap.keys(), ...toMap.keys()]);
+    const allAddresses = new Set([...Array.from(fromMap.keys()), ...Array.from(toMap.keys())]);
     const changes: any[] = [];
 
-    for (const addr of allAddresses) {
+    allAddresses.forEach((addr) => {
       const from = fromMap.get(addr);
       const to = toMap.get(addr);
       if (from && to) {
@@ -214,7 +215,7 @@ export class DatabaseStorage implements IStorage {
           rankChange: from.rank - to.rank,
         });
       }
-    }
+    });
 
     changes.sort((a, b) => b.balanceChange - a.balanceChange);
     const gainers = changes.filter(c => c.balanceChange > 0).slice(0, 10);
@@ -223,12 +224,38 @@ export class DatabaseStorage implements IStorage {
     return { gainers, losers };
   }
 
+  async searchAddresses(query: string): Promise<any[]> {
+    const allAddresses = await this.getAllUniqueAddresses();
+    const q = query.toLowerCase();
+    const matched = allAddresses.filter(a => a.toLowerCase().includes(q));
+
+    const labels = await this.getAllLabels();
+    const labelMap = new Map(labels.map(l => [l.address, l]));
+    const labelMatches = labels.filter(l =>
+      l.label?.toLowerCase().includes(q) || l.address.toLowerCase().includes(q)
+    ).map(l => l.address);
+
+    const combined = new Set([...matched, ...labelMatches]);
+    const results: any[] = [];
+
+    combined.forEach((addr) => {
+      const label = labelMap.get(addr);
+      results.push({
+        address: addr,
+        label: label?.label || null,
+        category: label?.category || null,
+      });
+    });
+
+    return results.slice(0, 20);
+  }
+
   async getHallOfFame(): Promise<any[]> {
     const latestSnapshot = await this.getLatestSnapshot();
     const latestEntries = latestSnapshot
       ? await this.getEntriesBySnapshotId(latestSnapshot.id)
       : [];
-    const activeAddresses = new Set(latestEntries.map(e => e.address));
+    const activeMap = new Map(latestEntries.map(e => [e.address, e]));
 
     const allAddresses = await this.getAllUniqueAddresses();
     const labels = await this.getAllLabels();
@@ -242,6 +269,8 @@ export class DatabaseStorage implements IStorage {
       const label = labelMap.get(addr);
       const ranks = history.map(h => h.rank);
       const dates = history.map(h => h.date);
+      const lastEntry = history[history.length - 1];
+      const activeEntry = activeMap.get(addr);
 
       results.push({
         address: addr,
@@ -251,7 +280,11 @@ export class DatabaseStorage implements IStorage {
         firstSeen: dates[0],
         lastSeen: dates[dates.length - 1],
         bestRank: Math.min(...ranks),
-        currentStatus: activeAddresses.has(addr) ? "active" : "inactive",
+        lastRank: lastEntry.rank,
+        lastBalance: lastEntry.balance,
+        currentRank: activeEntry?.rank || null,
+        currentBalance: activeEntry?.balance || null,
+        currentStatus: activeMap.has(addr) ? "active" : "inactive",
       });
     }
 
@@ -270,7 +303,7 @@ export class DatabaseStorage implements IStorage {
     const fromMap = new Map(fromEntries.map(e => [e.address, e]));
     const toMap = new Map(toEntries.map(e => [e.address, e]));
 
-    const allAddresses = new Set([...fromMap.keys(), ...toMap.keys()]);
+    const allAddresses = new Set([...Array.from(fromMap.keys()), ...Array.from(toMap.keys())]);
     const combined: any[] = [];
 
     let totalBalanceChange = 0;
@@ -279,7 +312,7 @@ export class DatabaseStorage implements IStorage {
     let newEntriesCount = 0;
     let dropoutsCount = 0;
 
-    for (const addr of allAddresses) {
+    allAddresses.forEach((addr) => {
       const from = fromMap.get(addr);
       const to = toMap.get(addr);
 
@@ -314,7 +347,7 @@ export class DatabaseStorage implements IStorage {
         balanceDiff,
         status,
       });
-    }
+    });
 
     combined.sort((a, b) => {
       if (a.status === "new" && b.status !== "new") return -1;

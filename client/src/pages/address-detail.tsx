@@ -118,7 +118,7 @@ export default function AddressDetail() {
               <LineChart data={rankData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis reversed domain={[1, 50]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis reversed domain={[1, 100]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",

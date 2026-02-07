@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
-import { Trophy, Users, Activity, Search } from "lucide-react";
-import { truncateAddress, getCategoryColor } from "@/lib/utils";
+import { Users, Activity, Search, UserMinus, ArrowDown } from "lucide-react";
+import { formatBalance, getCategoryColor } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -24,6 +24,10 @@ interface HallEntry {
   firstSeen: string;
   lastSeen: string;
   bestRank: number;
+  lastRank: number;
+  lastBalance: number;
+  currentRank: number | null;
+  currentBalance: number | null;
   currentStatus: "active" | "inactive";
 }
 
@@ -45,17 +49,19 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function HallOfFame() {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
-  const [sortBy, setSortBy] = useState<"appearances" | "bestRank" | "firstSeen">("appearances");
+  const [filter, setFilter] = useState<"all" | "active" | "dropped">("all");
+  const [sortBy, setSortBy] = useState<"appearances" | "bestRank" | "lastBalance" | "firstSeen">("appearances");
 
   const { data, isLoading } = useQuery<HallData>({
     queryKey: ["/api/hall-of-fame"],
   });
 
+  const droppedCount = data?.entries.filter(e => e.currentStatus === "inactive").length || 0;
+
   const filtered = data?.entries
     .filter((e) => {
       if (filter === "active") return e.currentStatus === "active";
-      if (filter === "inactive") return e.currentStatus === "inactive";
+      if (filter === "dropped") return e.currentStatus === "inactive";
       return true;
     })
     .filter((e) => {
@@ -66,6 +72,7 @@ export default function HallOfFame() {
     .sort((a, b) => {
       if (sortBy === "appearances") return b.totalAppearances - a.totalAppearances;
       if (sortBy === "bestRank") return a.bestRank - b.bestRank;
+      if (sortBy === "lastBalance") return b.lastBalance - a.lastBalance;
       return a.firstSeen.localeCompare(b.firstSeen);
     }) || [];
 
@@ -83,20 +90,21 @@ export default function HallOfFame() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
-      <h2 className="text-lg font-semibold">Hall of Fame</h2>
+      <h2 className="text-lg font-semibold" data-testid="text-hall-title">Hall of Fame</h2>
 
       {isLoading ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(2)].map((_, i) => <Card key={i}><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>)}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[...Array(3)].map((_, i) => <Card key={i}><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>)}
           </div>
           <Card><CardContent className="p-4">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />)}</CardContent></Card>
         </div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <StatCard title="Total Unique Addresses" value={data.stats.totalUnique} icon={Users} iconColor="text-purple-400" />
             <StatCard title="Currently Active" value={data.stats.currentlyActive} icon={Activity} iconColor="text-emerald-400" />
+            <StatCard title="Dropped Out" value={droppedCount} icon={UserMinus} iconColor="text-red-400" />
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -109,7 +117,7 @@ export default function HallOfFame() {
                       <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <Input
-                          placeholder="Search address or label..."
+                          placeholder="Search by full or partial address..."
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
                           className="pl-8 text-sm"
@@ -117,18 +125,41 @@ export default function HallOfFame() {
                         />
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        {(["all", "active", "inactive"] as const).map((f) => (
+                        {([
+                          { key: "all", label: "All" },
+                          { key: "active", label: "Active" },
+                          { key: "dropped", label: "Dropped" },
+                        ] as const).map((f) => (
                           <Button
-                            key={f}
-                            variant={filter === f ? "default" : "secondary"}
+                            key={f.key}
+                            variant={filter === f.key ? "default" : "secondary"}
                             size="sm"
-                            onClick={() => setFilter(f)}
-                            data-testid={`button-filter-${f}`}
+                            onClick={() => setFilter(f.key as any)}
+                            data-testid={`button-filter-${f.key}`}
                           >
-                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                            {f.label}
                           </Button>
                         ))}
                       </div>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      <span className="text-xs text-muted-foreground mr-1 self-center">Sort:</span>
+                      {([
+                        { key: "appearances", label: "Appearances" },
+                        { key: "bestRank", label: "Best Rank" },
+                        { key: "lastBalance", label: "Last Balance" },
+                        { key: "firstSeen", label: "First Seen" },
+                      ] as const).map((s) => (
+                        <Button
+                          key={s.key}
+                          variant={sortBy === s.key ? "outline" : "ghost"}
+                          size="sm"
+                          onClick={() => setSortBy(s.key as any)}
+                          data-testid={`button-sort-${s.key}`}
+                        >
+                          {s.label}
+                        </Button>
+                      ))}
                     </div>
                   </div>
                 </CardHeader>
@@ -138,50 +169,62 @@ export default function HallOfFame() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Address</TableHead>
-                          <TableHead className="text-center cursor-pointer" onClick={() => setSortBy("appearances")}>
-                            <span className={sortBy === "appearances" ? "text-primary" : ""}>Apps</span>
-                          </TableHead>
-                          <TableHead className="text-center cursor-pointer hidden sm:table-cell" onClick={() => setSortBy("bestRank")}>
-                            <span className={sortBy === "bestRank" ? "text-primary" : ""}>Best #</span>
-                          </TableHead>
-                          <TableHead className="text-center cursor-pointer hidden md:table-cell" onClick={() => setSortBy("firstSeen")}>
-                            <span className={sortBy === "firstSeen" ? "text-primary" : ""}>First Seen</span>
-                          </TableHead>
                           <TableHead className="text-center">Status</TableHead>
+                          <TableHead className="text-center hidden sm:table-cell">Best #</TableHead>
+                          <TableHead className="text-right hidden md:table-cell">Last Balance</TableHead>
+                          <TableHead className="text-center hidden lg:table-cell">Apps</TableHead>
+                          <TableHead className="text-center hidden lg:table-cell">First Seen</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filtered.map((e) => (
                           <TableRow key={e.address} className="hover-elevate cursor-pointer" data-testid={`row-hall-${e.address.slice(0, 8)}`}>
-                            <TableCell>
+                            <TableCell className="max-w-[300px]">
                               <Link href={`/address/${e.address}`}>
-                                <div>
+                                <div className="space-y-0.5">
                                   {e.label && (
-                                    <Badge variant="outline" className={`text-xs mb-0.5 no-default-hover-elevate no-default-active-elevate ${getCategoryColor(e.category)}`}>
+                                    <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${getCategoryColor(e.category)}`}>
                                       {e.label}
                                     </Badge>
                                   )}
-                                  <p className="font-mono text-xs text-muted-foreground">{truncateAddress(e.address)}</p>
+                                  <p className="font-mono text-xs text-muted-foreground break-all">{e.address}</p>
+                                  {e.currentStatus === "inactive" && (
+                                    <p className="text-xs text-muted-foreground">Last rank: #{e.lastRank}</p>
+                                  )}
                                 </div>
                               </Link>
                             </TableCell>
-                            <TableCell className="text-center text-sm">{e.totalAppearances}</TableCell>
-                            <TableCell className="text-center text-sm hidden sm:table-cell">#{e.bestRank}</TableCell>
-                            <TableCell className="text-center text-xs text-muted-foreground hidden md:table-cell">{e.firstSeen}</TableCell>
                             <TableCell className="text-center">
-                              <Badge
-                                variant="outline"
-                                className={`text-xs no-default-hover-elevate no-default-active-elevate ${
-                                  e.currentStatus === "active"
-                                    ? "text-emerald-400 border-emerald-400/20 bg-emerald-400/10"
-                                    : "text-muted-foreground"
-                                }`}
-                              >
-                                {e.currentStatus === "active" ? "Active" : "Inactive"}
-                              </Badge>
+                              {e.currentStatus === "active" ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs no-default-hover-elevate no-default-active-elevate text-emerald-400 border-emerald-400/20 bg-emerald-400/10"
+                                >
+                                  #{e.currentRank}
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs no-default-hover-elevate no-default-active-elevate text-red-400 border-red-400/20 bg-red-400/10"
+                                >
+                                  <ArrowDown className="w-3 h-3 mr-0.5" />
+                                  Dropped
+                                </Badge>
+                              )}
                             </TableCell>
+                            <TableCell className="text-center text-sm hidden sm:table-cell">#{e.bestRank}</TableCell>
+                            <TableCell className="text-right font-mono text-xs hidden md:table-cell">{formatBalance(e.lastBalance)} ELA</TableCell>
+                            <TableCell className="text-center text-sm hidden lg:table-cell">{e.totalAppearances}</TableCell>
+                            <TableCell className="text-center text-xs text-muted-foreground hidden lg:table-cell">{e.firstSeen}</TableCell>
                           </TableRow>
                         ))}
+                        {filtered.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                              No addresses found matching your search
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -224,7 +267,7 @@ export default function HallOfFame() {
                       </ResponsiveContainer>
                       <div className="space-y-1.5 mt-2">
                         {pieData.map((entry) => (
-                          <div key={entry.name} className="flex items-center justify-between text-xs">
+                          <div key={entry.name} className="flex items-center justify-between gap-2 text-xs">
                             <div className="flex items-center gap-2">
                               <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
                               <span>{entry.name}</span>

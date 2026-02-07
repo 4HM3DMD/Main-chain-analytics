@@ -181,6 +181,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/search", async (req, res) => {
+    try {
+      const q = (req.query.q as string) || "";
+      if (q.length < 3) return res.json({ results: [] });
+      const results = await storage.searchAddresses(q);
+      res.json({ results });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/hall-of-fame", async (_req, res) => {
     try {
       const entries = await storage.getHallOfFame();

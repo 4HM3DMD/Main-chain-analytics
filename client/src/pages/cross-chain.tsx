@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Layers, ArrowRight, ExternalLink } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Layers, ArrowRight, ExternalLink, ArrowDownUp } from "lucide-react";
 import { formatBalance, formatSupplyPct, ELA_TOTAL_SUPPLY } from "@/lib/utils";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -236,6 +237,86 @@ export default function CrossChain() {
           </CardContent>
         </Card>
       )}
+
+      {/* Ethereum Recent Transfers */}
+      <EthTransfers />
     </div>
+  );
+}
+
+// ─── Ethereum Transfers Component ─────────────────────────────────────────
+
+interface EthTransferData {
+  transfers: Array<{
+    from: string;
+    to: string;
+    value: number;
+    timestamp: string;
+    txHash: string;
+  }>;
+  contractAddress: string;
+}
+
+function EthTransfers() {
+  const { data, isLoading } = useQuery<EthTransferData>({
+    queryKey: ["/api/ethereum/transfers"],
+    refetchInterval: 300000,
+  });
+
+  if (isLoading) return <Card><CardContent className="p-4"><Skeleton className="h-40 w-full" /></CardContent></Card>;
+  if (!data?.transfers.length) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ArrowDownUp className="w-4 h-4 text-amber-400" />
+            Recent ELA Transfers on Ethereum
+          </CardTitle>
+          <a href={`https://etherscan.io/token/${data.contractAddress}`} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1">
+            Etherscan <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>From</TableHead>
+                <TableHead>To</TableHead>
+                <TableHead className="text-right">Amount (ELA)</TableHead>
+                <TableHead className="hidden md:table-cell">Time</TableHead>
+                <TableHead className="hidden lg:table-cell">TX</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.transfers.map((t, i) => (
+                <TableRow key={`${t.txHash}-${i}`}>
+                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                    {t.from.slice(0, 8)}...{t.from.slice(-4)}
+                  </TableCell>
+                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                    {t.to.slice(0, 8)}...{t.to.slice(-4)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatBalance(t.value)}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
+                    {t.timestamp ? new Date(t.timestamp).toLocaleString() : "—"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <a href={`https://etherscan.io/tx/${t.txHash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-amber-400 hover:underline font-mono">
+                      {t.txHash.slice(0, 10)}...
+                    </a>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

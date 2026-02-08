@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { storage } from "./storage";
 import { triggerManualSnapshot, startScheduler, initializeIfEmpty } from "./services/scheduler";
+import { fetchEthRecentTransfers } from "./services/eth-fetcher";
 import { backfillConcentrationMetrics, backfillEntryAnalytics } from "./services/backfill";
 import { seedAddressLabels } from "./services/seed-labels";
 import { log } from "./index";
@@ -488,6 +489,20 @@ export async function registerRoutes(
         entries,
         stats: { totalSnapshots },
       });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /**
+   * GET /api/ethereum/transfers?count=20
+   * Recent ELA ERC-20 transfers on Ethereum via Alchemy.
+   */
+  app.get("/api/ethereum/transfers", async (req, res) => {
+    try {
+      const count = Math.min(parseInt(req.query.count as string) || 20, 50);
+      const transfers = await fetchEthRecentTransfers(count);
+      res.json({ transfers, contractAddress: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

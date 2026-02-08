@@ -13,7 +13,7 @@ export const snapshots = pgTable("snapshots", {
   totalBalances: real("total_balances"),
   totalRichlist: integer("total_richlist"),
 }, (table) => [
-  unique("snapshots_chain_date_time_slot").on(table.chain, table.date, table.timeSlot),
+  unique("snapshots_date_time_slot").on(table.date, table.timeSlot, table.chain),
   index("snapshots_chain_idx").on(table.chain),
 ]);
 
@@ -43,7 +43,6 @@ export const addressLabels = pgTable("address_labels", {
   label: text("label").notNull(),
   category: text("category"),
   notes: text("notes"),                               // Optional intel/context about this address
-  chain: text("chain").default("mainchain"),           // mainchain | esc | ethereum
 });
 
 export const dailySummary = pgTable("daily_summary", {

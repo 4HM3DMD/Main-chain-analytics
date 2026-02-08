@@ -11,6 +11,7 @@ const KNOWN_ADDRESSES = [
   { address: "ENqof4f3bvpLLZVXMALUL4b8hDAJHAVxU6", label: "F2Pool Mining", category: "pool" },
   { address: "EPEzY8RqLoHiKB5sXsRLNmMcE6ESqvY6Zq", label: "F2Pool Mining", category: "pool" },
   { address: "EMRKTXN183vwcGbCetvKuUPHMyQScRjx6F", label: "Antpool Mining", category: "pool" },
+  { address: "EfZ6oNo4oKgefbuX3t2dVrH9ME2mR4ZZka", label: "Antpool Mining", category: "pool" },
   { address: "XV5cSp1y1PU4xXSQs5oaaLExgHA2xHYjp5", label: "ECO Chain Transfer", category: "sidechain" },
   { address: "XNQWEZ7aqNyJHvav8j8tNo2ZQypuTsWQk6", label: "PGP Chain Transfer", category: "sidechain" },
   // Exchanges

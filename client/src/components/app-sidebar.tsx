@@ -66,7 +66,7 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         <div className="text-xs text-muted-foreground space-y-1">
           <p>Powered by Elastos Blockchain</p>
-          <p>Snapshots every 2 hours</p>
+          <p>Snapshots every 5 minutes</p>
         </div>
       </SidebarFooter>
     </Sidebar>

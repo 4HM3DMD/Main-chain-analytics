@@ -109,7 +109,7 @@ export default function GhostWallets() {
                   </div>
                   <p className="text-2xl font-bold font-mono">{count}</p>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    {Number(length) === 1 ? "Appeared once, then gone" : `Lasted ${Number(length) * 2} hours`}
+                    {Number(length) === 1 ? "Appeared once, then gone" : `Lasted ${Number(length) * 5} minutes`}
                   </p>
                 </CardContent>
               </Card>
@@ -230,7 +230,7 @@ export default function GhostWallets() {
               <div className="grid md:grid-cols-3 gap-4 text-xs text-muted-foreground">
                 <div>
                   <p className="font-medium text-foreground mb-1">Single-Snapshot Flash</p>
-                  <p>Wallet appears in one snapshot then vanishes completely. Could indicate a large fund transfer being routed through the address momentarily — in and out within 2 hours.</p>
+                  <p>Wallet appears in one snapshot then vanishes completely. Could indicate a large fund transfer being routed through the address momentarily — in and out within 5 minutes.</p>
                 </div>
                 <div>
                   <p className="font-medium text-foreground mb-1">High Balance, Low Duration</p>

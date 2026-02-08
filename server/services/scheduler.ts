@@ -6,9 +6,10 @@ import { storage } from "../storage";
 import { log } from "../index";
 
 function getCurrentTimeSlot(): string {
-  const hour = new Date().getUTCHours();
-  const slotHour = Math.floor(hour / 2) * 2;
-  return `${slotHour.toString().padStart(2, "0")}:00`;
+  const now = new Date();
+  const hour = now.getUTCHours();
+  const minute = Math.floor(now.getUTCMinutes() / 5) * 5;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
 function getTodayDate(): string {
@@ -189,13 +190,13 @@ async function computeWeeklySummary(): Promise<void> {
 }
 
 export function startScheduler(): void {
-  // Snapshot every 2 hours
-  cron.schedule("0 */2 * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
+  // Snapshot every 5 minutes
+  cron.schedule("*/5 * * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
 
   // Weekly summary every Sunday at 23:59 UTC
   cron.schedule("59 23 * * 0", () => computeWeeklySummary(), { timezone: "UTC" });
 
-  log("Scheduler started: snapshots every 2h UTC, weekly summary Sundays 23:59 UTC", "scheduler");
+  log("Scheduler started: snapshots every 5 minutes UTC, weekly summary Sundays 23:59 UTC", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {

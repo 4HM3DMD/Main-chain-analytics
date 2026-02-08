@@ -165,7 +165,7 @@ export async function registerRoutes(
       const lastSnapshotId = history[history.length - 1].snapshotId;
       const spanSnapshots = lastSnapshotId - firstSnapshotId + 1;
       const missedSnapshots = Math.max(0, spanSnapshots - history.length);
-      const hasDormancy = missedSnapshots >= 6;
+      const hasDormancy = missedSnapshots >= 144;
 
       res.json({
         address,

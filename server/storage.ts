@@ -664,7 +664,7 @@ export class DatabaseStorage implements IStorage {
           (a.last_snapshot_id - a.first_snapshot_id + 1) AS span_snapshots,
           (a.last_snapshot_id - a.first_snapshot_id + 1) - a.appearances AS missed_snapshots
         FROM address_snapshots a
-        WHERE (a.last_snapshot_id - a.first_snapshot_id + 1) - a.appearances >= 6
+        WHERE (a.last_snapshot_id - a.first_snapshot_id + 1) - a.appearances >= 144
       )
       SELECT
         g.address,

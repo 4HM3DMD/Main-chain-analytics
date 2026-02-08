@@ -270,8 +270,8 @@ export function detectDormancy(
     }
   }
 
-  // Only count as dormancy if gap is >= 6 snapshots (~12 hours)
-  if (maxGap < 6) return null;
+  // Only count as dormancy if gap is >= 144 snapshots (~12 hours at 5-min intervals)
+  if (maxGap < 144) return null;
 
   const beforeGap = appearances.filter(a => a.snapshotId < gapStart);
   const afterGap = appearances.filter(a => a.snapshotId >= gapEnd);

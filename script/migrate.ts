@@ -45,6 +45,16 @@ async function migrate() {
     `);
     console.log("  cross_chain_supply table: OK");
 
+    // 5. Clean up any non-mainchain data (ESC snapshots that polluted the DB)
+    const delMetrics = await pool.query(`DELETE FROM concentration_metrics WHERE chain != 'mainchain'`);
+    const delEntries = await pool.query(`DELETE FROM snapshot_entries WHERE snapshot_id IN (SELECT id FROM snapshots WHERE chain != 'mainchain')`);
+    const delSnaps = await pool.query(`DELETE FROM snapshots WHERE chain != 'mainchain'`);
+    const delCross = await pool.query(`DELETE FROM cross_chain_supply`);
+    const cleaned = (delMetrics.rowCount || 0) + (delEntries.rowCount || 0) + (delSnaps.rowCount || 0) + (delCross.rowCount || 0);
+    if (cleaned > 0) {
+      console.log(`  Cleaned ${cleaned} non-mainchain rows`);
+    }
+
     console.log("Pre-push migrations complete!");
   } catch (error: any) {
     console.error("Migration error:", error.message);

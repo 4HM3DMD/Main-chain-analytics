@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle, Gauge, Zap, ArrowUpDown } from "lucide-react";
+import { Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle, Gauge, Zap, ArrowUpDown, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,6 @@ import { StatCard } from "@/components/stat-card";
 import { RankMedal } from "@/components/rank-badge";
 import { AddressDisplay } from "@/components/address-display";
 import { formatBalance, formatBalanceChange, formatPercentage, timeAgo, truncateAddress, formatWAI, getWAIColor, getWAILevel, formatCompact, getChangeColor, getWealthSpreadLevel, getWealthSpreadPct, formatSupplyPct, ELA_TOTAL_SUPPLY } from "@/lib/utils";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -77,27 +75,12 @@ const CATEGORY_FILTERS = [
 ];
 
 export default function Dashboard() {
-  const { toast } = useToast();
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<"rank" | "balance" | "change">("rank");
+  const [sortBy, setSortBy] = useState<"rank" | "change" | "supply">("rank");
 
   const { data, isLoading, error, refetch } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
     refetchInterval: 300000,
-  });
-
-  const triggerMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/snapshots/trigger");
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Snapshot triggered", description: "A new snapshot has been taken successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Snapshot failed", description: err.message, variant: "destructive" });
-    },
   });
 
   if (error) {
@@ -129,20 +112,8 @@ export default function Dashboard() {
           <Database className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-lg font-semibold mb-2">Welcome to ELA Whale Tracker</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            No snapshots yet. Click the button below to take your first snapshot and start tracking the top 100 ELA wallets.
+            No snapshots yet. The first snapshot will be taken automatically within 5 minutes.
           </p>
-          <Button
-            onClick={() => triggerMutation.mutate()}
-            disabled={triggerMutation.isPending}
-            data-testid="button-first-snapshot"
-          >
-            {triggerMutation.isPending ? (
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Camera className="w-4 h-4 mr-2" />
-            )}
-            Take First Snapshot
-          </Button>
         </div>
       </div>
     );
@@ -167,8 +138,8 @@ export default function Dashboard() {
       return e.category === categoryFilter;
     })
     .sort((a, b) => {
-      if (sortBy === "balance") return b.balance - a.balance;
       if (sortBy === "change") return Math.abs(b.balanceChange || 0) - Math.abs(a.balanceChange || 0);
+      if (sortBy === "supply") return (b.percentage || 0) - (a.percentage || 0);
       return a.rank - b.rank;
     });
 
@@ -197,7 +168,7 @@ export default function Dashboard() {
         <StatCard
           title="Total Snapshots"
           value={dashboard.stats.totalSnapshots}
-          icon={Camera}
+          icon={Clock}
           iconColor="text-purple-400"
         />
         <StatCard
@@ -370,8 +341,8 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground mr-1">Sort:</span>
             {([
               { key: "rank", label: "Rank" },
-              { key: "balance", label: "Balance" },
               { key: "change", label: "Biggest Change" },
+              { key: "supply", label: "% Supply" },
             ] as const).map((s) => (
               <Button
                 key={s.key}

@@ -7,12 +7,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Camera, RefreshCw, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 
@@ -111,23 +107,6 @@ function HeaderSearch() {
 }
 
 function HeaderBar() {
-  const { toast } = useToast();
-
-  const triggerMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/snapshots/trigger");
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Snapshot triggered", description: "A new snapshot has been taken." });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/snapshots"] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Failed", description: err.message, variant: "destructive" });
-    },
-  });
-
   return (
     <header className="flex items-center justify-between gap-2 p-3 border-b sticky top-0 z-50 bg-background/95 backdrop-blur">
       <div className="flex items-center gap-2">
@@ -136,20 +115,6 @@ function HeaderBar() {
       </div>
       <div className="flex items-center gap-2">
         <HeaderSearch />
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => triggerMutation.mutate()}
-          disabled={triggerMutation.isPending}
-          data-testid="button-trigger-snapshot"
-        >
-          {triggerMutation.isPending ? (
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-          ) : (
-            <Camera className="w-3.5 h-3.5 mr-1.5" />
-          )}
-          <span className="hidden sm:inline">Snapshot</span>
-        </Button>
         <ThemeToggle />
       </div>
     </header>

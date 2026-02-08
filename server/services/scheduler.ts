@@ -67,13 +67,24 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
       ? await storage.getEntriesBySnapshotId(prevSnapshot.id)
       : [];
 
-    const tempSnapshot = await storage.insertSnapshot({
-      date,
-      timeSlot,
-      fetchedAt: new Date().toISOString(),
-      totalBalances: fetchResult.totalBalances,
-      totalRichlist: fetchResult.richlist.length,
-    });
+    let tempSnapshot;
+    try {
+      tempSnapshot = await storage.insertSnapshot({
+        date,
+        timeSlot,
+        fetchedAt: new Date().toISOString(),
+        totalBalances: fetchResult.totalBalances,
+        totalRichlist: fetchResult.richlist.length,
+      });
+    } catch (insertErr: any) {
+      // Handle race condition: another snapshot for this slot was inserted between check and insert
+      if (insertErr.code === "23505") {
+        log(`Snapshot for ${date} ${timeSlot} was already inserted (race condition), skipping`, "scheduler");
+        const existing = await storage.getSnapshotByDateAndSlot(date, timeSlot);
+        return existing;
+      }
+      throw insertErr;
+    }
 
     // Build address history for advanced analytics (streaks, volatility, trends)
     const addresses = fetchResult.richlist.map(r => r.address);

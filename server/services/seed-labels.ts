@@ -1,4 +1,7 @@
 import { storage } from "../storage";
+import { db } from "../db";
+import { addressLabels } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { log } from "../index";
 
 const KNOWN_ADDRESSES = [
@@ -24,15 +27,25 @@ const KNOWN_ADDRESSES = [
   { address: "8PwL7pYuDS9EHFa2ej6ZLoy95TxeZV8dzJ", label: "Potential EF Address", category: "ef", notes: "Strictly used for voting in Term 6 Elastos DAO elections, hence high probability of being an Elastos Foundation address." },
   { address: "EabAPwWynzzEn8uYyRXGwyvJ4V42CqWuev", label: "Potential EF Address", category: "ef", notes: "Flagged due to suspicious activity patterns consistent with Elastos Foundation operations." },
   { address: "EUv3qKaZUmtfhxdQyML7qk7VAko2shAnfV", label: "Potential EF Address", category: "ef", notes: "Flagged due to suspicious activity patterns consistent with Elastos Foundation operations." },
-  // Known Whales
-  { address: "EJitWuvoWBjeqju2K4AkgaqPof47V3HcDQ", label: "Paxen (Whale)", category: "whale" },
-  { address: "EYL34pvhFrfSkafBrAeXKgFua4CmJmYQos", label: "Paxen (Whale)", category: "whale" },
+];
+
+// Addresses to remove (temporarily unlabeled)
+const REMOVE_ADDRESSES = [
+  "EJitWuvoWBjeqju2K4AkgaqPof47V3HcDQ",
+  "EYL34pvhFrfSkafBrAeXKgFua4CmJmYQos",
 ];
 
 export async function seedAddressLabels(): Promise<void> {
   log("Seeding known address labels...", "seed");
   for (const entry of KNOWN_ADDRESSES) {
     await storage.upsertAddressLabel(entry);
+  }
+  // Remove temporarily unlabeled addresses
+  for (const addr of REMOVE_ADDRESSES) {
+    await db.delete(addressLabels).where(eq(addressLabels.address, addr));
+  }
+  if (REMOVE_ADDRESSES.length > 0) {
+    log(`Removed ${REMOVE_ADDRESSES.length} temporary labels`, "seed");
   }
   log(`Seeded ${KNOWN_ADDRESSES.length} address labels`, "seed");
 }

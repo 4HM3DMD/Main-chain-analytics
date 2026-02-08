@@ -35,12 +35,19 @@ export async function fetchEscRichList(): Promise<EscFetchResult> {
 
       const allItems: any[] = [];
 
-      // Fetch 2 pages of 50 = 100 addresses
-      for (let page = 1; page <= 2; page++) {
+      // Fetch pages using cursor-based pagination (Blockscout V2 uses next_page_params)
+      let nextPageParams: Record<string, string> | null = null;
+
+      for (let page = 0; page < 2; page++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const url = `${ESC_API_BASE}/addresses?type=base_address&sort=balance&order=desc&page=${page}`;
+        let url = `${ESC_API_BASE}/addresses?type=base_address&sort=balance&order=desc`;
+        if (nextPageParams) {
+          const params = new URLSearchParams(nextPageParams);
+          url += `&${params.toString()}`;
+        }
+
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
 
@@ -54,11 +61,21 @@ export async function fetchEscRichList(): Promise<EscFetchResult> {
         }
 
         allItems.push(...data.items);
+        nextPageParams = data.next_page_params || null;
+        if (!nextPageParams) break; // No more pages
       }
+
+      // Deduplicate by address (safety net)
+      const seen = new Set<string>();
+      const uniqueItems = allItems.filter(item => {
+        if (seen.has(item.hash)) return false;
+        seen.add(item.hash);
+        return true;
+      });
 
       // Convert Wei to ELA and compute total
       let totalSupply = 0;
-      const richlist: EscRichListItem[] = allItems.slice(0, 100).map((item) => {
+      const richlist: EscRichListItem[] = uniqueItems.slice(0, 100).map((item) => {
         const balanceWei = BigInt(item.coin_balance || "0");
         const balanceEla = Number(balanceWei) / 1e18;
         totalSupply += balanceEla;

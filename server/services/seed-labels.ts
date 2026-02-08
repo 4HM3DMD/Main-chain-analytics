@@ -29,11 +29,13 @@ const KNOWN_ADDRESSES = [
   { address: "EUv3qKaZUmtfhxdQyML7qk7VAko2shAnfV", label: "Potential EF Address", category: "ef", notes: "Flagged due to suspicious activity patterns consistent with Elastos Foundation operations." },
   // ─── ESC (Elastos Smart Chain) Labels ───────────────────────────────────
   // These are 0x addresses — never collide with mainchain addresses
-  { address: "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4", label: "ESC Top Holder #1", category: "whale", notes: "Largest native ELA holder on Elastos Smart Chain" },
+  // All ELA on ESC originates from mainchain's XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf (ESC Sidechain Transfer)
+  { address: "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4", label: "ShadowTokens Bridge (ETH Proxy)", category: "sidechain", notes: "ShadowTokens bridge contract — all ELA bridged to Ethereum goes through this address. Source of all ELA ERC-20 on Ethereum." },
   { address: "0xC882b111A75C0c657fC507C04FbFcD2cC984F071", label: "Glide Finance", category: "exchange", notes: "Glide Finance DEX on ESC" },
   { address: "0x517E9e5d46C1EA8aB6f78677d6114Ef47F71f6c4", label: "FilDA Protocol", category: "dao", notes: "FilDA lending protocol on ESC" },
   // ─── Ethereum Labels ───────────────────────────────────────────────────
-  { address: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum, bridged via ShadowTokens from ESC" },
+  // All ELA on Ethereum is bridged from ESC via ShadowTokens (0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4)
+  { address: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum. All ELA here is bridged from ESC via ShadowTokens. Flow: Main Chain → ESC Bridge → ESC → ShadowTokens → Ethereum." },
 ];
 
 // Addresses to remove (temporarily unlabeled)

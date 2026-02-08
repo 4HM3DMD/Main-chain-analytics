@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export type Chain = "mainchain" | "esc" | "ethereum";
 
@@ -53,7 +54,14 @@ const ChainContext = createContext<ChainContextType>({
 });
 
 export function ChainProvider({ children }: { children: ReactNode }) {
-  const [chain, setChain] = useState<Chain>("mainchain");
+  const [chain, setChainState] = useState<Chain>("mainchain");
+  const queryClient = useQueryClient();
+
+  const setChain = useCallback((newChain: Chain) => {
+    setChainState(newChain);
+    // Clear all cached data so stale chain data doesn't persist
+    queryClient.clear();
+  }, [queryClient]);
 
   const chainInfo = CHAINS[chain];
   const chainParam = chain === "mainchain" ? "" : `?chain=${chain}`;

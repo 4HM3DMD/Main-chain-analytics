@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,13 +48,15 @@ export default function History() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data: snapshotsData, isLoading } = useQuery<{ snapshots: SnapshotListItem[]; total: number }>({
-    queryKey: ["/api/snapshots", `?page=${page}&limit=20`],
+    queryKey: ["/api/snapshots", `?page=${page}&limit=20${chainSuffix ? `&${chainSuffix}` : ""}`],
   });
 
   const { data: detailData, isLoading: detailLoading } = useQuery<SnapshotDetail>({
-    queryKey: ["/api/snapshots", selectedSnapshotId?.toString() ?? ""],
+    queryKey: ["/api/snapshots", selectedSnapshotId?.toString() ?? "", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     enabled: selectedSnapshotId !== null,
   });
 

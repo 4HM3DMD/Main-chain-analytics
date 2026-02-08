@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,9 +45,11 @@ export default function Compare() {
 
   const [fromDate, setFromDate] = useState(weekAgo);
   const [toDate, setToDate] = useState(today);
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading, error } = useQuery<CompareResult>({
-    queryKey: ["/api/compare", `?from=${fromDate}&to=${toDate}`],
+    queryKey: ["/api/compare", `?from=${fromDate}&to=${toDate}${chainSuffix ? `&${chainSuffix}` : ""}`],
     enabled: !!fromDate && !!toDate && fromDate !== toDate,
   });
 

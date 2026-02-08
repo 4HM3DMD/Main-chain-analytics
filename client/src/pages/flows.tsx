@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,8 +78,11 @@ const tickStyle = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
 const axisStroke = "hsl(var(--muted-foreground))";
 
 export default function Flows() {
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+
   const { data, isLoading } = useQuery<FlowsData>({
-    queryKey: ["/api/flows"],
+    queryKey: ["/api/flows", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     refetchInterval: 300000,
   });
 

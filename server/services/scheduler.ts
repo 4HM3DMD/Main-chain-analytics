@@ -262,8 +262,28 @@ async function takeEscSnapshot(): Promise<void> {
       throw err;
     }
 
-    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, escSnapshot.id);
+    // Build address history for ESC analytics
+    let escAddressHistory: AddressHistoryMap | undefined;
+    try {
+      const addrs = fetchResult.richlist.map(r => r.address);
+      escAddressHistory = {};
+      for (const addr of addrs) {
+        try {
+          const entries = await storage.getRecentAddressEntries(addr, 30);
+          if (entries.length > 0) escAddressHistory[addr] = entries;
+        } catch { /* skip */ }
+      }
+    } catch { /* non-critical */ }
+
+    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, escSnapshot.id, escAddressHistory);
     await storage.insertSnapshotEntries(analysis.entries);
+
+    // Compute concentration metrics for ESC
+    try {
+      const storedEntries = await storage.getEntriesBySnapshotId(escSnapshot.id);
+      const metrics = buildConcentrationMetrics(escSnapshot.id, date, timeSlot, storedEntries, analysis.newEntries.length, analysis.dropouts.length);
+      await storage.insertConcentrationMetrics({ ...metrics, chain: "esc" });
+    } catch { /* non-critical */ }
 
     log(`ESC snapshot ${escSnapshot.id}: ${analysis.entries.length} entries`, "scheduler");
     escFailures = 0;

@@ -7,6 +7,11 @@ import { fetchEthElaSupply, fetchEthRecentTransfers } from "./services/eth-fetch
 import { seedAddressLabels } from "./services/seed-labels";
 import { log } from "./index";
 
+/** Extract chain from query parameter, default to mainchain */
+function getChain(req: any): string {
+  return (req.query.chain as string) || "mainchain";
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -31,21 +36,22 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/dashboard", async (_req, res) => {
+  app.get("/api/dashboard", async (req, res) => {
     try {
-      const snapshot = await storage.getLatestSnapshot();
+      const chain = getChain(req);
+      const snapshot = await storage.getLatestSnapshot(chain);
       let entries: any[] = [];
 
       if (snapshot) {
         entries = await storage.getEntriesWithLabels(snapshot.id);
       }
 
-      const totalSnapshots = await storage.getSnapshotCount();
+      const totalSnapshots = await storage.getSnapshotCount(chain);
       const uniqueAddresses = await storage.getUniqueAddressCount();
 
-      const allSnapshots = await storage.getSnapshots(1, 1);
+      const allSnapshots = await storage.getSnapshots(1, 1, chain);
       const oldestSnapshot = allSnapshots.total > 0
-        ? (await storage.getSnapshots(allSnapshots.total, 1)).snapshots[0]
+        ? (await storage.getSnapshots(allSnapshots.total, 1, chain)).snapshots[0]
         : null;
 
       const summaries = await storage.getRecentSummaries(5);
@@ -53,7 +59,7 @@ export async function registerRoutes(
       // Fetch latest analytics metrics
       let analytics = null;
       try {
-        const latestMetrics = await storage.getLatestConcentrationMetrics();
+        const latestMetrics = await storage.getLatestConcentrationMetrics(chain);
         if (latestMetrics) {
           analytics = {
             giniCoefficient: latestMetrics.giniCoefficient,
@@ -91,9 +97,10 @@ export async function registerRoutes(
 
   app.get("/api/snapshots", async (req, res) => {
     try {
+      const chain = getChain(req);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      const result = await storage.getSnapshots(page, limit);
+      const result = await storage.getSnapshots(page, limit, chain);
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -129,12 +136,13 @@ export async function registerRoutes(
 
   app.get("/api/compare", async (req, res) => {
     try {
+      const chain = getChain(req);
       const from = req.query.from as string;
       const to = req.query.to as string;
 
       if (!from || !to) return res.status(400).json({ message: "from and to dates required" });
 
-      const result = await storage.getCompareData(from, to);
+      const result = await storage.getCompareData(from, to, chain);
       if (!result) return res.status(404).json({ message: "No data for the specified dates" });
 
       res.json(result);
@@ -207,6 +215,7 @@ export async function registerRoutes(
 
   app.get("/api/movers", async (req, res) => {
     try {
+      const chain = getChain(req);
       const period = (req.query.period as string) || "7d";
       let daysBack: number;
       switch (period) {
@@ -218,11 +227,11 @@ export async function registerRoutes(
       const toDate = new Date().toISOString().split("T")[0];
       const fromDate = new Date(Date.now() - daysBack * 86400000).toISOString().split("T")[0];
 
-      let result = await storage.getMovers(fromDate, toDate);
+      let result = await storage.getMovers(fromDate, toDate, chain);
 
       // If no results (e.g. all snapshots on same day), fallback to first vs latest snapshot
       if (result.gainers.length === 0 && result.losers.length === 0) {
-        const allSnaps = await storage.getSnapshots(1, 1000);
+        const allSnaps = await storage.getSnapshots(1, 1000, chain);
         if (allSnaps.snapshots.length >= 2) {
           const latest = allSnaps.snapshots[0];
           const oldest = allSnaps.snapshots[allSnaps.snapshots.length - 1];
@@ -249,10 +258,11 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/hall-of-fame", async (_req, res) => {
+  app.get("/api/hall-of-fame", async (req, res) => {
     try {
-      const entries = await storage.getHallOfFame();
-      const latestSnapshot = await storage.getLatestSnapshot();
+      const chain = getChain(req);
+      const entries = await storage.getHallOfFame(chain);
+      const latestSnapshot = await storage.getLatestSnapshot(chain);
       const latestEntries = latestSnapshot
         ? await storage.getEntriesBySnapshotId(latestSnapshot.id)
         : [];
@@ -271,7 +281,8 @@ export async function registerRoutes(
 
   app.get("/api/flows", async (req, res) => {
     try {
-      const latestSnapshot = await storage.getLatestSnapshot();
+      const chain = getChain(req);
+      const latestSnapshot = await storage.getLatestSnapshot(chain);
       if (!latestSnapshot) return res.status(404).json({ message: "No snapshots available" });
 
       const entries = await storage.getEntriesWithLabels(latestSnapshot.id);
@@ -307,7 +318,7 @@ export async function registerRoutes(
       // Use pre-computed concentration_metrics for flow trend (fixes N+1 query issue)
       let flowTrend: Array<{ date: string; timeSlot: string; totalBalance: number; top10Balance: number; top20Balance: number; gini?: number; wai?: number }> = [];
       try {
-        const metricsHistory = (await storage.getConcentrationHistory(50)).reverse();
+        const metricsHistory = (await storage.getConcentrationHistory(50, chain)).reverse();
         if (metricsHistory.length > 0) {
           flowTrend = metricsHistory.map(m => ({
             date: m.date,
@@ -321,7 +332,7 @@ export async function registerRoutes(
         }
       } catch {
         // Fallback to legacy N+1 approach if concentration_metrics table doesn't exist yet
-        const allSnapshots = await storage.getSnapshots(1, 100);
+        const allSnapshots = await storage.getSnapshots(1, 100, chain);
         const snapshotsToProcess = allSnapshots.snapshots.slice(0, 50).reverse();
         for (const snap of snapshotsToProcess) {
           const snapEntries = await storage.getEntriesBySnapshotId(snap.id);
@@ -371,6 +382,7 @@ export async function registerRoutes(
    */
   app.get("/api/dashboard/changes", async (req, res) => {
     try {
+      const chain = getChain(req);
       const period = (req.query.period as string) || "5m";
 
       // Calculate target time
@@ -383,7 +395,7 @@ export async function registerRoutes(
         default: msAgo = 0; // "5m" or "latest" = use pre-computed
       }
 
-      const latestSnapshot = await storage.getLatestSnapshot();
+      const latestSnapshot = await storage.getLatestSnapshot(chain);
       if (!latestSnapshot) return res.json({ period, changes: {}, compareSnapshot: null });
 
       // For "latest/5m", just return the pre-computed balanceChange from the current snapshot
@@ -403,7 +415,7 @@ export async function registerRoutes(
 
       // Find the snapshot closest to the target time
       const targetTime = new Date(Date.now() - msAgo);
-      const compareSnapshot = await storage.getSnapshotClosestTo(targetTime);
+      const compareSnapshot = await storage.getSnapshotClosestTo(targetTime, chain);
       if (!compareSnapshot || compareSnapshot.id === latestSnapshot.id) {
         return res.json({ period, changes: {}, compareSnapshot: null, message: "No comparison snapshot available for this period" });
       }
@@ -441,9 +453,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/entities", async (_req, res) => {
+  app.get("/api/entities", async (req, res) => {
     try {
-      const latestSnapshot = await storage.getLatestSnapshot();
+      const chain = getChain(req);
+      const latestSnapshot = await storage.getLatestSnapshot(chain);
       if (!latestSnapshot) return res.json({ entities: [] });
 
       const entries = await storage.getEntriesWithLabels(latestSnapshot.id);
@@ -610,10 +623,11 @@ export async function registerRoutes(
    * GET /api/analytics/overview
    * Returns current Gini, HHI, WAI, net flow, concentration, and trend data.
    */
-  app.get("/api/analytics/overview", async (_req, res) => {
+  app.get("/api/analytics/overview", async (req, res) => {
     try {
-      const latest = await storage.getLatestConcentrationMetrics();
-      const history = await storage.getConcentrationHistory(100);
+      const chain = getChain(req);
+      const latest = await storage.getLatestConcentrationMetrics(chain);
+      const history = await storage.getConcentrationHistory(100, chain);
       const weeklySummaries = await storage.getRecentWeeklySummaries(12);
 
       // Compute trends (compare latest vs 24h ago, 7d ago, 30d ago)
@@ -655,9 +669,10 @@ export async function registerRoutes(
    */
   app.get("/api/analytics/streaks", async (req, res) => {
     try {
+      const chain = getChain(req);
       const type = (req.query.type as string) === "balance" ? "balance" : "rank";
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-      const leaders = await storage.getStreakLeaders(type, limit);
+      const leaders = await storage.getStreakLeaders(type, limit, chain);
       res.json({ type, leaders });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -668,9 +683,10 @@ export async function registerRoutes(
    * GET /api/analytics/dormant
    * Wallets that left and re-entered top 100.
    */
-  app.get("/api/analytics/dormant", async (_req, res) => {
+  app.get("/api/analytics/dormant", async (req, res) => {
     try {
-      const dormant = await storage.getDormantWallets();
+      const chain = getChain(req);
+      const dormant = await storage.getDormantWallets(chain);
       res.json({ wallets: dormant });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -683,8 +699,9 @@ export async function registerRoutes(
    */
   app.get("/api/analytics/ghost-wallets", async (req, res) => {
     try {
+      const chain = getChain(req);
       const maxAppearances = Math.min(Math.max(parseInt(req.query.maxAppearances as string) || 3, 1), 10);
-      const ghosts = await storage.getGhostWallets(maxAppearances);
+      const ghosts = await storage.getGhostWallets(maxAppearances, chain);
 
       // Group by stint length for summary stats
       const byStintLength: Record<number, number> = {};
@@ -708,9 +725,10 @@ export async function registerRoutes(
    * GET /api/analytics/accumulation
    * All wallets with their trend classification.
    */
-  app.get("/api/analytics/accumulation", async (_req, res) => {
+  app.get("/api/analytics/accumulation", async (req, res) => {
     try {
-      const breakdown = await storage.getAccumulationBreakdown();
+      const chain = getChain(req);
+      const breakdown = await storage.getAccumulationBreakdown(chain);
 
       const summary = {
         accumulating: breakdown.filter(b => b.balanceTrend === "accumulating").length,
@@ -754,8 +772,9 @@ export async function registerRoutes(
    */
   app.get("/api/analytics/net-flows", async (req, res) => {
     try {
+      const chain = getChain(req);
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
-      const flows = await storage.getNetFlowHistory(limit);
+      const flows = await storage.getNetFlowHistory(limit, chain);
       res.json({ flows: flows.reverse() }); // chronological
     } catch (err: any) {
       res.status(500).json({ message: err.message });

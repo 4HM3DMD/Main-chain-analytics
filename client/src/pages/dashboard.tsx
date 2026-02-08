@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle, Gauge, Zap, ArrowUpDown, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,14 +94,16 @@ export default function Dashboard() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"rank" | "change" | "supply">("rank");
   const [comparePeriod, setComparePeriod] = useState("5m");
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading, error, refetch } = useQuery<DashboardData>({
-    queryKey: ["/api/dashboard"],
+    queryKey: ["/api/dashboard", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     refetchInterval: 300000,
   });
 
   const { data: changesData } = useQuery<ChangesData>({
-    queryKey: ["/api/dashboard/changes", `?period=${comparePeriod}`],
+    queryKey: ["/api/dashboard/changes", `?period=${comparePeriod}${chainSuffix ? `&${chainSuffix}` : ""}`],
     refetchInterval: 300000,
     enabled: comparePeriod !== "5m", // Only fetch when not using default
   });

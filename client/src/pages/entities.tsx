@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,8 +32,11 @@ interface EntitiesData {
 }
 
 export default function Entities() {
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+
   const { data, isLoading } = useQuery<EntitiesData>({
-    queryKey: ["/api/entities"],
+    queryKey: ["/api/entities", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     refetchInterval: 300000,
   });
 

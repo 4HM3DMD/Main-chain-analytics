@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams } from "wouter";
+import { useChain, CHAINS } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,9 +79,11 @@ export default function AddressDetail() {
   const { toast } = useToast();
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [labelForm, setLabelForm] = useState({ label: "", category: "", notes: "" });
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading, error } = useQuery<AddressData>({
-    queryKey: ["/api/address", address],
+    queryKey: ["/api/address", address, ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     enabled: !!address,
   });
 
@@ -435,8 +438,11 @@ interface TxData {
 }
 
 function RecentTransactions({ address }: { address: string }) {
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+
   const { data, isLoading, error } = useQuery<TxData>({
-    queryKey: ["/api/address", address, "/transactions"],
+    queryKey: ["/api/address", address, `/transactions${chainSuffix ? `?${chainSuffix}` : ""}`],
   });
 
   if (error) return null; // Silently fail — blockchain API might be down
@@ -465,7 +471,7 @@ function RecentTransactions({ address }: { address: string }) {
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{data.txCount} total txns</span>
             <a
-              href={`https://blockchain.elastos.io/address/${address}`}
+              href={`${CHAINS[chain].explorerUrl}/${address}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-blue-400 hover:underline"
@@ -513,7 +519,7 @@ function RecentTransactions({ address }: { address: string }) {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <a
-                      href={`https://blockchain.elastos.io/tx/${tx.txid}`}
+                      href={`${CHAINS[chain].explorerUrl.replace("/address", "/tx")}/${tx.txid}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-mono text-[10px] text-blue-400 hover:underline"

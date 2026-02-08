@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,34 +173,36 @@ export default function Analytics() {
   const [trendFilter, setTrendFilter] = useState<string | null>(null);
   const [streakType, setStreakType] = useState<"rank" | "balance">("rank");
   const [ghostMaxAppearances, setGhostMaxAppearances] = useState(3);
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewData>({
-    queryKey: ["/api/analytics/overview"],
+    queryKey: ["/api/analytics/overview", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     refetchInterval: 300000,
   });
 
   const { data: accumulation, isLoading: accLoading } = useQuery<AccumulationData>({
-    queryKey: ["/api/analytics/accumulation"],
+    queryKey: ["/api/analytics/accumulation", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     enabled: activeTab === "accumulation",
   });
 
   const { data: streaks, isLoading: streaksLoading } = useQuery<StreakData>({
-    queryKey: ["/api/analytics/streaks", `?type=${streakType}`],
+    queryKey: ["/api/analytics/streaks", `?type=${streakType}${chainSuffix ? `&${chainSuffix}` : ""}`],
     enabled: activeTab === "streaks",
   });
 
   const { data: netFlows, isLoading: flowsLoading } = useQuery<NetFlowData>({
-    queryKey: ["/api/analytics/net-flows"],
+    queryKey: ["/api/analytics/net-flows", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     enabled: activeTab === "flows",
   });
 
   const { data: dormant, isLoading: dormantLoading } = useQuery<DormantData>({
-    queryKey: ["/api/analytics/dormant"],
+    queryKey: ["/api/analytics/dormant", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     enabled: activeTab === "dormant",
   });
 
   const { data: ghosts, isLoading: ghostsLoading } = useQuery<GhostWalletsData>({
-    queryKey: ["/api/analytics/ghost-wallets", `?maxAppearances=${ghostMaxAppearances}`],
+    queryKey: ["/api/analytics/ghost-wallets", `?maxAppearances=${ghostMaxAppearances}${chainSuffix ? `&${chainSuffix}` : ""}`],
     enabled: activeTab === "ghosts",
   });
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,9 +55,11 @@ export default function HallOfFame() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "dropped">("all");
   const [sortBy, setSortBy] = useState<"appearances" | "bestRank" | "lastBalance" | "firstSeen">("appearances");
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading } = useQuery<HallData>({
-    queryKey: ["/api/hall-of-fame"],
+    queryKey: ["/api/hall-of-fame", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
   });
 
   const droppedCount = data?.entries.filter(e => e.currentStatus === "inactive").length || 0;

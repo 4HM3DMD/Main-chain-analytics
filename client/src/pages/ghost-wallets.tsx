@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,9 +33,11 @@ interface GhostWalletsData {
 
 export default function GhostWallets() {
   const [maxAppearances, setMaxAppearances] = useState(3);
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading } = useQuery<GhostWalletsData>({
-    queryKey: ["/api/analytics/ghost-wallets", `?maxAppearances=${maxAppearances}`],
+    queryKey: ["/api/analytics/ghost-wallets", `?maxAppearances=${maxAppearances}${chainSuffix ? `&${chainSuffix}` : ""}`],
   });
 
   return (

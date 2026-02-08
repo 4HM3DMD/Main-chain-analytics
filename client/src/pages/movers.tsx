@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,9 +30,11 @@ interface MoversData {
 
 export default function Movers() {
   const [period, setPeriod] = useState("7d");
+  const { chain } = useChain();
+  const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading } = useQuery<MoversData>({
-    queryKey: ["/api/movers", `?period=${period}`],
+    queryKey: ["/api/movers", `?period=${period}${chainSuffix ? `&${chainSuffix}` : ""}`],
   });
 
   return (

@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ChainProvider, useChain } from "@/lib/chain-context";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -22,8 +23,6 @@ import HallOfFame from "@/pages/hall-of-fame";
 import Analytics from "@/pages/analytics";
 import GhostWallets from "@/pages/ghost-wallets";
 import Entities from "@/pages/entities";
-import EscDashboard from "@/pages/esc-dashboard";
-import EthOverview from "@/pages/eth-overview";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,8 +32,6 @@ function Router() {
       <Route path="/analytics" component={Analytics} />
       <Route path="/ghost-wallets" component={GhostWallets} />
       <Route path="/entities" component={Entities} />
-      <Route path="/esc" component={EscDashboard} />
-      <Route path="/ethereum" component={EthOverview} />
       <Route path="/flows" component={Flows} />
       <Route path="/history" component={History} />
       <Route path="/compare" component={Compare} />
@@ -134,20 +131,22 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 min-w-0">
-                <HeaderBar />
-                <main className="flex-1 overflow-y-auto">
-                  <Router />
-                </main>
+        <ChainProvider>
+          <TooltipProvider>
+            <SidebarProvider style={style as React.CSSProperties}>
+              <div className="flex h-screen w-full">
+                <AppSidebar />
+                <div className="flex flex-col flex-1 min-w-0">
+                  <HeaderBar />
+                  <main className="flex-1 overflow-y-auto">
+                    <Router />
+                  </main>
+                </div>
               </div>
-            </div>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
+            </SidebarProvider>
+            <Toaster />
+          </TooltipProvider>
+        </ChainProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

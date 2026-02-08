@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle, Gauge, Zap, ArrowUpDown } from "lucide-react";
+import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle, Gauge, Zap, ArrowUpDown, Filter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,8 +65,21 @@ interface DashboardData {
   }>;
 }
 
+const CATEGORY_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "unknown", label: "Unknown" },
+  { key: "exchange", label: "Exchanges" },
+  { key: "pool", label: "Pools" },
+  { key: "sidechain", label: "Sidechains" },
+  { key: "dao", label: "DAO" },
+  { key: "ef", label: "EF" },
+  { key: "whale", label: "Whales" },
+];
+
 export default function Dashboard() {
   const { toast } = useToast();
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"rank" | "balance" | "change">("rank");
 
   const { data, isLoading, error, refetch } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -144,6 +158,24 @@ export default function Dashboard() {
   const significantMovers = dashboard.entries.filter(
     (e) => e.balanceChange !== null && Math.abs(e.balanceChange) > 1000
   ).sort((a, b) => Math.abs(b.balanceChange!) - Math.abs(a.balanceChange!)).slice(0, 5);
+
+  // Filter and sort entries for the table
+  const filteredEntries = dashboard.entries
+    .filter((e) => {
+      if (categoryFilter === "all") return true;
+      if (categoryFilter === "unknown") return !e.category;
+      return e.category === categoryFilter;
+    })
+    .sort((a, b) => {
+      if (sortBy === "balance") return b.balance - a.balance;
+      if (sortBy === "change") return Math.abs(b.balanceChange || 0) - Math.abs(a.balanceChange || 0);
+      return a.rank - b.rank;
+    });
+
+  // Change context: what time the change is relative to
+  const changeContext = dashboard.snapshot
+    ? `vs previous snapshot`
+    : "";
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
@@ -312,12 +344,45 @@ export default function Dashboard() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-          <CardTitle className="text-base">Top 100 Wallets</CardTitle>
-          <div className="flex items-center gap-2">
+        <CardHeader className="pb-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Top 100 Wallets</CardTitle>
             <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
-              {dashboard.entries.length} wallets
+              {filteredEntries.length}{categoryFilter !== "all" ? ` / ${dashboard.entries.length}` : ""} wallets
             </Badge>
+          </div>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-1">
+            {CATEGORY_FILTERS.map((f) => (
+              <Button
+                key={f.key}
+                variant={categoryFilter === f.key ? "default" : "secondary"}
+                size="sm"
+                className="text-xs h-7 px-2.5"
+                onClick={() => setCategoryFilter(f.key)}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+          {/* Sort */}
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground mr-1">Sort:</span>
+            {([
+              { key: "rank", label: "Rank" },
+              { key: "balance", label: "Balance" },
+              { key: "change", label: "Biggest Change" },
+            ] as const).map((s) => (
+              <Button
+                key={s.key}
+                variant={sortBy === s.key ? "outline" : "ghost"}
+                size="sm"
+                className="text-xs h-7 px-2.5"
+                onClick={() => setSortBy(s.key)}
+              >
+                {s.label}
+              </Button>
+            ))}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -328,12 +393,17 @@ export default function Dashboard() {
                   <TableHead className="w-14 text-center">#</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead className="text-right">Balance (ELA)</TableHead>
-                  <TableHead className="text-right hidden md:table-cell">ELA Change</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">
+                    <div className="flex flex-col items-end">
+                      <span>ELA Change</span>
+                      <span className="text-[10px] font-normal text-muted-foreground">{changeContext}</span>
+                    </div>
+                  </TableHead>
                   <TableHead className="text-right hidden lg:table-cell">% Supply</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dashboard.entries.map((entry) => (
+                {filteredEntries.map((entry) => (
                   <TableRow
                     key={entry.address}
                     className="cursor-pointer hover-elevate"

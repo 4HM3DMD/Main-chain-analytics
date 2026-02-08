@@ -5,6 +5,10 @@ import { buildConcentrationMetrics } from "./analytics";
 import { storage } from "../storage";
 import { log } from "../index";
 
+// Backoff state: skip snapshot attempts after consecutive failures
+let consecutiveFailures = 0;
+let skipUntil: Date | null = null;
+
 function getCurrentTimeSlot(): string {
   const now = new Date();
   const hour = now.getUTCHours();
@@ -46,6 +50,13 @@ async function buildAddressHistoryMap(
 }
 
 async function takeSnapshot(trigger: string = "cron"): Promise<any> {
+  // Backoff: skip if we're in a cooldown period (unless manual trigger)
+  if (trigger !== "manual" && skipUntil && new Date() < skipUntil) {
+    const mins = Math.ceil((skipUntil.getTime() - Date.now()) / 60000);
+    log(`Skipping snapshot — API backoff active, resuming in ${mins}m (${consecutiveFailures} consecutive failures)`, "scheduler");
+    return null;
+  }
+
   const date = getTodayDate();
   const timeSlot = trigger === "manual" ? new Date().toISOString().split("T")[1].slice(0, 5) : getCurrentTimeSlot();
 
@@ -129,10 +140,27 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
 
     log(`Snapshot ${snapshot.id} completed: ${analysis.entries.length} entries, ${analysis.newEntries.length} new, ${analysis.dropouts.length} dropouts`, "scheduler");
 
+    // Reset backoff on success
+    if (consecutiveFailures > 0) {
+      log(`API recovered after ${consecutiveFailures} consecutive failures`, "scheduler");
+    }
+    consecutiveFailures = 0;
+    skipUntil = null;
+
     return snapshot;
   } catch (error: any) {
-    log(`Snapshot failed: ${error.message}`, "scheduler");
-    throw error;
+    consecutiveFailures++;
+    log(`Snapshot failed (failure #${consecutiveFailures}): ${error.message}`, "scheduler");
+
+    // After 3 consecutive failures, back off for 15 minutes
+    if (consecutiveFailures >= 3) {
+      const backoffMinutes = Math.min(15 * Math.pow(2, Math.floor((consecutiveFailures - 3) / 3)), 120);
+      skipUntil = new Date(Date.now() + backoffMinutes * 60000);
+      log(`API appears down — backing off for ${backoffMinutes} minutes (until ${skipUntil.toISOString()})`, "scheduler");
+    }
+
+    if (trigger === "manual") throw error;
+    return null;
   }
 }
 

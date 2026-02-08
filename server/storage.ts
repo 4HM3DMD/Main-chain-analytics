@@ -80,7 +80,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestSnapshot(): Promise<Snapshot | undefined> {
-    const [result] = await db.select().from(snapshots).orderBy(desc(snapshots.id)).limit(1);
+    const [result] = await db.select().from(snapshots)
+      .where(eq(snapshots.chain, "mainchain"))
+      .orderBy(desc(snapshots.id)).limit(1);
     return result;
   }
 
@@ -91,20 +93,20 @@ export class DatabaseStorage implements IStorage {
 
   async getSnapshots(page: number, limit: number): Promise<{ snapshots: Snapshot[]; total: number }> {
     const offset = (page - 1) * limit;
-    const results = await db.select().from(snapshots).orderBy(desc(snapshots.id)).limit(limit).offset(offset);
-    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(snapshots);
+    const results = await db.select().from(snapshots).where(eq(snapshots.chain, "mainchain")).orderBy(desc(snapshots.id)).limit(limit).offset(offset);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(snapshots).where(eq(snapshots.chain, "mainchain"));
     return { snapshots: results, total: count };
   }
 
   async getSnapshotByDateAndSlot(date: string, timeSlot: string): Promise<Snapshot | undefined> {
     const [result] = await db.select().from(snapshots)
-      .where(and(eq(snapshots.date, date), eq(snapshots.timeSlot, timeSlot)));
+      .where(and(eq(snapshots.date, date), eq(snapshots.timeSlot, timeSlot), eq(snapshots.chain, "mainchain")));
     return result;
   }
 
   async getLastSnapshotOfDate(date: string): Promise<Snapshot | undefined> {
     const [result] = await db.select().from(snapshots)
-      .where(eq(snapshots.date, date))
+      .where(and(eq(snapshots.date, date), eq(snapshots.chain, "mainchain")))
       .orderBy(desc(snapshots.id))
       .limit(1);
     return result;
@@ -172,7 +174,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSnapshotCount(): Promise<number> {
-    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(snapshots);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(snapshots).where(eq(snapshots.chain, "mainchain"));
     return count;
   }
 
@@ -470,10 +472,11 @@ export class DatabaseStorage implements IStorage {
   // ─── Analytics: Recent Address Entries ──────────────────────────────────
 
   async getSnapshotClosestTo(targetTime: Date): Promise<Snapshot | undefined> {
-    // Find the snapshot with fetchedAt closest to targetTime
+    // Find the mainchain snapshot with fetchedAt closest to targetTime
     const targetIso = targetTime.toISOString();
     const results = await db.execute(sql`
       SELECT * FROM snapshots
+      WHERE chain = 'mainchain'
       ORDER BY ABS(EXTRACT(EPOCH FROM (fetched_at::timestamp - ${targetIso}::timestamp)))
       LIMIT 1
     `);
@@ -511,7 +514,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllSnapshotIds(): Promise<number[]> {
-    const results = await db.select({ id: snapshots.id }).from(snapshots).orderBy(asc(snapshots.id));
+    const results = await db.select({ id: snapshots.id }).from(snapshots).where(eq(snapshots.chain, "mainchain")).orderBy(asc(snapshots.id));
     return results.map(r => r.id);
   }
 
@@ -524,12 +527,14 @@ export class DatabaseStorage implements IStorage {
 
   async getConcentrationHistory(limit: number): Promise<ConcentrationMetrics[]> {
     return db.select().from(concentrationMetrics)
+      .where(eq(concentrationMetrics.chain, "mainchain"))
       .orderBy(desc(concentrationMetrics.id))
       .limit(limit);
   }
 
   async getLatestConcentrationMetrics(): Promise<ConcentrationMetrics | undefined> {
     const [result] = await db.select().from(concentrationMetrics)
+      .where(eq(concentrationMetrics.chain, "mainchain"))
       .orderBy(desc(concentrationMetrics.id))
       .limit(1);
     return result;

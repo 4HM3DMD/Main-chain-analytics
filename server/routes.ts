@@ -1,10 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { sql } from "drizzle-orm";
-import { db } from "./db";
 import { storage } from "./storage";
 import { triggerManualSnapshot, startScheduler, initializeIfEmpty } from "./services/scheduler";
-import { fetchEthRecentTransfers } from "./services/eth-fetcher";
 import { backfillConcentrationMetrics, backfillEntryAnalytics } from "./services/backfill";
 import { seedAddressLabels } from "./services/seed-labels";
 import { log } from "./index";
@@ -438,71 +435,6 @@ export async function registerRoutes(
           label: period === "24h" ? "yesterday" : period === "7d" ? "7 days ago" : period === "30d" ? "30 days ago" : `${period} ago`,
         },
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * GET /api/cross-chain/overview
-   * Cross-chain ELA supply breakdown and history.
-   */
-  app.get("/api/cross-chain/overview", async (_req, res) => {
-    try {
-      const latest = await storage.getLatestCrossChainSupply();
-      const history = (await storage.getCrossChainHistory(200)).reverse();
-
-      const totalSupply = 28220000; // Known ELA total supply
-
-      res.json({
-        current: latest ? {
-          ...latest,
-          totalSupply,
-          mainchainOther: totalSupply - (latest.escBridgeBalance || 0) - (latest.mainchainTop100 || 0),
-          escNotInTop100: (latest.escTotalSupply || 0) - (latest.escTop100 || 0),
-        } : null,
-        history,
-        totalSupply,
-      });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * GET /api/esc/dashboard
-   * ESC chain dashboard — latest snapshot with entries.
-   */
-  app.get("/api/esc/dashboard", async (_req, res) => {
-    try {
-      const snapshot = await storage.getLatestSnapshotByChain("esc");
-      if (!snapshot) return res.json({ snapshot: null, entries: [], stats: { totalSnapshots: 0 } });
-
-      const entries = await storage.getEntriesWithLabels(snapshot.id);
-
-      // Count ESC snapshots
-      const allSnaps = await db.execute(sql`SELECT COUNT(*)::int AS count FROM snapshots WHERE chain = 'esc'`);
-      const totalSnapshots = (allSnaps.rows[0] as any)?.count || 0;
-
-      res.json({
-        snapshot,
-        entries,
-        stats: { totalSnapshots },
-      });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  /**
-   * GET /api/ethereum/transfers?count=20
-   * Recent ELA ERC-20 transfers on Ethereum via Alchemy.
-   */
-  app.get("/api/ethereum/transfers", async (req, res) => {
-    try {
-      const count = Math.min(parseInt(req.query.count as string) || 20, 50);
-      const transfers = await fetchEthRecentTransfers(count);
-      res.json({ transfers, contractAddress: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

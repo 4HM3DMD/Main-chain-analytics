@@ -1,7 +1,5 @@
 import cron from "node-cron";
 import { fetchRichList } from "./fetcher";
-import { fetchEscRichList } from "./esc-fetcher";
-import { fetchEthElaSupply } from "./eth-fetcher";
 import { analyzeSnapshot, type AddressHistoryMap } from "./analyzer";
 import { buildConcentrationMetrics } from "./analytics";
 import { storage } from "../storage";
@@ -230,150 +228,24 @@ async function computeWeeklySummary(): Promise<void> {
   }
 }
 
-// ─── ESC Snapshot ─────────────────────────────────────────────────────────
-
-let escConsecutiveFailures = 0;
-let escSkipUntil: Date | null = null;
-
-async function takeEscSnapshot(): Promise<void> {
-  if (escSkipUntil && new Date() < escSkipUntil) {
-    return; // Backoff active
-  }
-
-  const date = getTodayDate();
-  const timeSlot = getCurrentTimeSlot();
-
-  try {
-    // Check duplicate
-    const existing = await storage.getSnapshotByDateSlotChain(date, timeSlot, "esc");
-    if (existing) return;
-
-    const fetchResult = await fetchEscRichList();
-
-    const prevSnapshot = await storage.getLatestSnapshotByChain("esc");
-    const prevEntries = prevSnapshot
-      ? await storage.getEntriesBySnapshotId(prevSnapshot.id)
-      : [];
-
-    let escSnapshot;
-    try {
-      escSnapshot = await storage.insertSnapshot({
-        chain: "esc",
-        date,
-        timeSlot,
-        fetchedAt: new Date().toISOString(),
-        totalBalances: fetchResult.totalSupply,
-        totalRichlist: fetchResult.richlist.length,
-      });
-    } catch (insertErr: any) {
-      if (insertErr.code === "23505") return; // Race condition
-      throw insertErr;
-    }
-
-    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, escSnapshot.id);
-    await storage.insertSnapshotEntries(analysis.entries);
-
-    // Compute concentration metrics for ESC
-    try {
-      const storedEntries = await storage.getEntriesBySnapshotId(escSnapshot.id);
-      const metrics = buildConcentrationMetrics(escSnapshot.id, date, timeSlot, storedEntries, analysis.newEntries.length, analysis.dropouts.length);
-      await storage.insertConcentrationMetrics({ ...metrics, chain: "esc" });
-    } catch { /* non-critical */ }
-
-    log(`ESC snapshot ${escSnapshot.id}: ${analysis.entries.length} entries`, "scheduler");
-    escConsecutiveFailures = 0;
-    escSkipUntil = null;
-  } catch (error: any) {
-    escConsecutiveFailures++;
-    log(`ESC snapshot failed (#${escConsecutiveFailures}): ${error.message}`, "scheduler");
-    if (escConsecutiveFailures >= 3) {
-      const mins = Math.min(15 * Math.pow(2, Math.floor((escConsecutiveFailures - 3) / 3)), 120);
-      escSkipUntil = new Date(Date.now() + mins * 60000);
-      log(`ESC API backoff for ${mins} minutes`, "scheduler");
-    }
-  }
-}
-
-// ─── Cross-Chain Supply Snapshot ──────────────────────────────────────────
-
-async function takeCrossChainSnapshot(): Promise<void> {
-  const date = getTodayDate();
-  const timeSlot = getCurrentTimeSlot();
-
-  try {
-    // Get mainchain data
-    const mainSnapshot = await storage.getLatestSnapshot();
-    const mainEntries = mainSnapshot ? await storage.getEntriesBySnapshotId(mainSnapshot.id) : [];
-    const mainTop100 = mainEntries.reduce((s, e) => s + e.balance, 0);
-
-    // Get ESC bridge balance from mainchain (the ESC sidechain transfer address)
-    const escBridgeEntry = mainEntries.find(e => e.address === "XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf");
-    const escBridgeBalance = escBridgeEntry?.balance || 0;
-
-    // Get ESC data
-    const escSnapshot = await storage.getLatestSnapshotByChain("esc");
-    const escEntries = escSnapshot ? await storage.getEntriesBySnapshotId(escSnapshot.id) : [];
-    const escTop100 = escEntries.reduce((s, e) => s + e.balance, 0);
-    const escTotalSupply = escSnapshot?.totalBalances || 0;
-
-    // Get Ethereum supply
-    let ethSupply = 0;
-    try {
-      const ethResult = await fetchEthElaSupply();
-      ethSupply = ethResult.totalSupply;
-    } catch { /* non-critical */ }
-
-    await storage.insertCrossChainSupply({
-      date,
-      timeSlot,
-      fetchedAt: new Date().toISOString(),
-      mainchainTop100: mainTop100,
-      escBridgeBalance,
-      escTotalSupply,
-      escTop100,
-      ethBridgedSupply: ethSupply,
-    });
-
-    log(`Cross-chain: Main=${mainTop100.toFixed(0)}, ESC bridge=${escBridgeBalance.toFixed(0)}, ESC top100=${escTop100.toFixed(0)}, ETH=${ethSupply.toFixed(0)}`, "scheduler");
-  } catch (error: any) {
-    log(`Cross-chain snapshot failed: ${error.message}`, "scheduler");
-  }
-}
-
 export function startScheduler(): void {
   // Mainchain snapshot every 5 minutes
   cron.schedule("*/5 * * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
 
-  // ESC snapshot every 5 minutes (offset by 1 minute to avoid overlap)
-  cron.schedule("1-59/5 * * * *", () => takeEscSnapshot(), { timezone: "UTC" });
-
-  // Cross-chain supply snapshot every 5 minutes (offset by 2 minutes)
-  cron.schedule("2-59/5 * * * *", () => takeCrossChainSnapshot(), { timezone: "UTC" });
-
   // Weekly summary every Sunday at 23:59 UTC
   cron.schedule("59 23 * * 0", () => computeWeeklySummary(), { timezone: "UTC" });
 
-  log("Scheduler started: mainchain + ESC + cross-chain every 5min, weekly summary Sundays", "scheduler");
+  log("Scheduler started: snapshots every 5 minutes UTC, weekly summary Sundays 23:59 UTC", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {
   const count = await storage.getSnapshotCount();
   if (count === 0) {
-    log("Database is empty, taking initial snapshots...", "scheduler");
+    log("Database is empty, taking initial snapshot...", "scheduler");
     try {
       await takeSnapshot("init");
     } catch (error: any) {
-      log(`Initial mainchain snapshot failed: ${error.message}`, "scheduler");
-    }
-    try {
-      await takeEscSnapshot();
-    } catch (error: any) {
-      log(`Initial ESC snapshot failed: ${error.message}`, "scheduler");
-    }
-    try {
-      await takeCrossChainSnapshot();
-    } catch (error: any) {
-      log(`Initial cross-chain snapshot failed: ${error.message}`, "scheduler");
+      log(`Initial snapshot failed: ${error.message}`, "scheduler");
     }
   }
 }

@@ -22,8 +22,6 @@ import HallOfFame from "@/pages/hall-of-fame";
 import Analytics from "@/pages/analytics";
 import GhostWallets from "@/pages/ghost-wallets";
 import Entities from "@/pages/entities";
-import CrossChain from "@/pages/cross-chain";
-import EscDashboard from "@/pages/esc-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,8 +31,6 @@ function Router() {
       <Route path="/analytics" component={Analytics} />
       <Route path="/ghost-wallets" component={GhostWallets} />
       <Route path="/entities" component={Entities} />
-      <Route path="/cross-chain" component={CrossChain} />
-      <Route path="/esc" component={EscDashboard} />
       <Route path="/flows" component={Flows} />
       <Route path="/history" component={History} />
       <Route path="/compare" component={Compare} />

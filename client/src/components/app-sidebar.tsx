@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity, BarChart3, Ghost, Building2, Layers, Cpu } from "lucide-react";
+import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity, BarChart3, Ghost, Building2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,8 +23,6 @@ const navItems = [
   { title: "Compare", url: "/compare", icon: ArrowLeftRight },
   { title: "Movers", url: "/movers", icon: TrendingUp },
   { title: "Hall of Fame", url: "/hall-of-fame", icon: Trophy },
-  { title: "ESC Chain", url: "/esc", icon: Cpu },
-  { title: "Cross-Chain", url: "/cross-chain", icon: Layers },
 ];
 
 export function AppSidebar() {

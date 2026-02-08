@@ -6,13 +6,15 @@ import { z } from "zod";
 
 export const snapshots = pgTable("snapshots", {
   id: serial("id").primaryKey(),
+  chain: text("chain").notNull().default("mainchain"),  // mainchain | esc | ethereum
   date: text("date").notNull(),
   timeSlot: text("time_slot").notNull(),
   fetchedAt: text("fetched_at").notNull(),
   totalBalances: real("total_balances"),
   totalRichlist: integer("total_richlist"),
 }, (table) => [
-  unique("snapshots_date_time_slot").on(table.date, table.timeSlot),
+  unique("snapshots_chain_date_time_slot").on(table.chain, table.date, table.timeSlot),
+  index("snapshots_chain_idx").on(table.chain),
 ]);
 
 export const snapshotEntries = pgTable("snapshot_entries", {
@@ -41,6 +43,7 @@ export const addressLabels = pgTable("address_labels", {
   label: text("label").notNull(),
   category: text("category"),
   notes: text("notes"),                               // Optional intel/context about this address
+  chain: text("chain").default("mainchain"),           // mainchain | esc | ethereum
 });
 
 export const dailySummary = pgTable("daily_summary", {
@@ -60,6 +63,7 @@ export const dailySummary = pgTable("daily_summary", {
 export const concentrationMetrics = pgTable("concentration_metrics", {
   id: serial("id").primaryKey(),
   snapshotId: integer("snapshot_id").notNull().references(() => snapshots.id).unique(),
+  chain: text("chain").notNull().default("mainchain"),
   date: text("date").notNull(),
   timeSlot: text("time_slot").notNull(),
   // Concentration metrics
@@ -128,6 +132,21 @@ export const walletCorrelations = pgTable("wallet_correlations", {
   unique("wallet_correlations_pair").on(table.addressA, table.addressB, table.period),
 ]);
 
+/** Cross-chain ELA supply snapshot — tracks how much ELA is on each chain */
+export const crossChainSupply = pgTable("cross_chain_supply", {
+  id: serial("id").primaryKey(),
+  date: text("date").notNull(),
+  timeSlot: text("time_slot").notNull(),
+  fetchedAt: text("fetched_at").notNull(),
+  mainchainTop100: real("mainchain_top100"),           // Total ELA in mainchain top 100
+  escBridgeBalance: real("esc_bridge_balance"),         // ELA locked in ESC bridge on mainchain
+  escTotalSupply: real("esc_total_supply"),             // Total ELA on ESC
+  escTop100: real("esc_top100"),                        // Total ELA in ESC top 100
+  ethBridgedSupply: real("eth_bridged_supply"),         // Total ELA on Ethereum (ERC-20)
+}, (table) => [
+  unique("cross_chain_supply_date_slot").on(table.date, table.timeSlot),
+]);
+
 // ─── Zod Schemas & Types ────────────────────────────────────────────────────
 
 export const insertSnapshotSchema = createInsertSchema(snapshots).omit({ id: true });
@@ -137,6 +156,7 @@ export const insertDailySummarySchema = createInsertSchema(dailySummary).omit({ 
 export const insertConcentrationMetricsSchema = createInsertSchema(concentrationMetrics).omit({ id: true });
 export const insertWeeklySummarySchema = createInsertSchema(weeklySummary).omit({ id: true });
 export const insertWalletCorrelationSchema = createInsertSchema(walletCorrelations).omit({ id: true });
+export const insertCrossChainSupplySchema = createInsertSchema(crossChainSupply).omit({ id: true });
 
 export type Snapshot = typeof snapshots.$inferSelect;
 export type InsertSnapshot = z.infer<typeof insertSnapshotSchema>;
@@ -152,3 +172,5 @@ export type WeeklySummary = typeof weeklySummary.$inferSelect;
 export type InsertWeeklySummary = z.infer<typeof insertWeeklySummarySchema>;
 export type WalletCorrelation = typeof walletCorrelations.$inferSelect;
 export type InsertWalletCorrelation = z.infer<typeof insertWalletCorrelationSchema>;
+export type CrossChainSupply = typeof crossChainSupply.$inferSelect;
+export type InsertCrossChainSupply = z.infer<typeof insertCrossChainSupplySchema>;

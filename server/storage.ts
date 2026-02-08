@@ -1,6 +1,6 @@
 import {
   snapshots, snapshotEntries, addressLabels, dailySummary,
-  concentrationMetrics, weeklySummary, walletCorrelations,
+  concentrationMetrics, weeklySummary, walletCorrelations, crossChainSupply,
   type Snapshot, type InsertSnapshot,
   type SnapshotEntry, type InsertSnapshotEntry,
   type AddressLabel, type InsertAddressLabel,
@@ -8,6 +8,7 @@ import {
   type ConcentrationMetrics, type InsertConcentrationMetrics,
   type WeeklySummary, type InsertWeeklySummary,
   type WalletCorrelation, type InsertWalletCorrelation,
+  type CrossChainSupply, type InsertCrossChainSupply,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql, inArray, asc } from "drizzle-orm";
@@ -480,6 +481,7 @@ export class DatabaseStorage implements IStorage {
     if (!row) return undefined;
     return {
       id: row.id,
+      chain: row.chain || "mainchain",
       date: row.date,
       timeSlot: row.time_slot,
       fetchedAt: row.fetched_at,
@@ -756,6 +758,50 @@ export class DatabaseStorage implements IStorage {
     `);
 
     return results.rows as any[];
+  }
+
+  // ─── Multi-Chain Methods ─────────────────────────────────────────────
+
+  async getSnapshotByDateSlotChain(date: string, timeSlot: string, chain: string): Promise<Snapshot | undefined> {
+    const [result] = await db.select().from(snapshots)
+      .where(and(eq(snapshots.date, date), eq(snapshots.timeSlot, timeSlot), eq(snapshots.chain, chain)));
+    return result;
+  }
+
+  async getLatestSnapshotByChain(chain: string): Promise<Snapshot | undefined> {
+    const [result] = await db.select().from(snapshots)
+      .where(eq(snapshots.chain, chain))
+      .orderBy(desc(snapshots.id))
+      .limit(1);
+    return result;
+  }
+
+  async insertCrossChainSupply(data: InsertCrossChainSupply): Promise<void> {
+    await db.insert(crossChainSupply).values(data)
+      .onConflictDoUpdate({
+        target: [crossChainSupply.date, crossChainSupply.timeSlot],
+        set: {
+          fetchedAt: data.fetchedAt,
+          mainchainTop100: data.mainchainTop100,
+          escBridgeBalance: data.escBridgeBalance,
+          escTotalSupply: data.escTotalSupply,
+          escTop100: data.escTop100,
+          ethBridgedSupply: data.ethBridgedSupply,
+        },
+      });
+  }
+
+  async getCrossChainHistory(limit: number): Promise<CrossChainSupply[]> {
+    return db.select().from(crossChainSupply)
+      .orderBy(desc(crossChainSupply.id))
+      .limit(limit);
+  }
+
+  async getLatestCrossChainSupply(): Promise<CrossChainSupply | undefined> {
+    const [result] = await db.select().from(crossChainSupply)
+      .orderBy(desc(crossChainSupply.id))
+      .limit(1);
+    return result;
   }
 
   async getNetFlowHistory(limit: number): Promise<any[]> {

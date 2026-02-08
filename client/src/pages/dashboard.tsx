@@ -74,13 +74,35 @@ const CATEGORY_FILTERS = [
   { key: "whale", label: "Whales" },
 ];
 
+const COMPARE_PERIODS = [
+  { key: "5m", label: "Last Snapshot" },
+  { key: "1h", label: "1 Hour" },
+  { key: "24h", label: "24 Hours" },
+  { key: "7d", label: "7 Days" },
+  { key: "30d", label: "30 Days" },
+];
+
+interface ChangesData {
+  period: string;
+  changes: Record<string, { balanceChange: number; balanceChangePct: number }>;
+  compareSnapshot: { date: string; timeSlot: string; label: string } | null;
+  message?: string;
+}
+
 export default function Dashboard() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"rank" | "change" | "supply">("rank");
+  const [comparePeriod, setComparePeriod] = useState("5m");
 
   const { data, isLoading, error, refetch } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
     refetchInterval: 300000,
+  });
+
+  const { data: changesData } = useQuery<ChangesData>({
+    queryKey: ["/api/dashboard/changes", `?period=${comparePeriod}`],
+    refetchInterval: 300000,
+    enabled: comparePeriod !== "5m", // Only fetch when not using default
   });
 
   if (error) {
@@ -130,6 +152,14 @@ export default function Dashboard() {
     (e) => e.balanceChange !== null && Math.abs(e.balanceChange) > 1000
   ).sort((a, b) => Math.abs(b.balanceChange!) - Math.abs(a.balanceChange!)).slice(0, 5);
 
+  // Get balance change for an address based on selected comparison period
+  const getChange = (address: string, defaultChange: number | null): { balanceChange: number; balanceChangePct: number } => {
+    if (comparePeriod !== "5m" && changesData?.changes?.[address]) {
+      return changesData.changes[address];
+    }
+    return { balanceChange: defaultChange || 0, balanceChangePct: 0 };
+  };
+
   // Filter and sort entries for the table
   const filteredEntries = dashboard.entries
     .filter((e) => {
@@ -138,15 +168,17 @@ export default function Dashboard() {
       return e.category === categoryFilter;
     })
     .sort((a, b) => {
-      if (sortBy === "change") return Math.abs(b.balanceChange || 0) - Math.abs(a.balanceChange || 0);
+      if (sortBy === "change") return Math.abs(getChange(b.address, b.balanceChange).balanceChange) - Math.abs(getChange(a.address, a.balanceChange).balanceChange);
       if (sortBy === "supply") return (b.percentage || 0) - (a.percentage || 0);
       return a.rank - b.rank;
     });
 
-  // Change context: what time the change is relative to
-  const changeContext = dashboard.snapshot
-    ? `vs previous snapshot`
-    : "";
+  // Change context label
+  const changeContext = comparePeriod === "5m"
+    ? "vs previous snapshot"
+    : changesData?.compareSnapshot
+      ? `vs ${changesData.compareSnapshot.label}`
+      : `vs ${comparePeriod} ago`;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
@@ -336,6 +368,21 @@ export default function Dashboard() {
               </Button>
             ))}
           </div>
+          {/* Compare Period */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-xs text-muted-foreground mr-1">ELA Change vs:</span>
+            {COMPARE_PERIODS.map((p) => (
+              <Button
+                key={p.key}
+                variant={comparePeriod === p.key ? "default" : "secondary"}
+                size="sm"
+                className="text-xs h-7 px-2.5"
+                onClick={() => setComparePeriod(p.key)}
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
           {/* Sort */}
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground mr-1">Sort:</span>
@@ -402,13 +449,23 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell className="text-right hidden md:table-cell">
                       <Link href={`/address/${entry.address}`}>
-                        {entry.balanceChange !== null ? (
-                          <span className={`text-xs font-mono ${entry.balanceChange > 0 ? "text-emerald-400" : entry.balanceChange < 0 ? "text-red-400" : "text-muted-foreground"}`}>
-                            {formatBalanceChange(entry.balanceChange)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        {(() => {
+                          const change = getChange(entry.address, entry.balanceChange);
+                          const bc = change.balanceChange;
+                          if (Math.abs(bc) < 0.01) return <span className="text-xs text-muted-foreground">—</span>;
+                          return (
+                            <div>
+                              <span className={`text-xs font-mono ${getChangeColor(bc)}`}>
+                                {formatBalanceChange(bc)}
+                              </span>
+                              {comparePeriod !== "5m" && change.balanceChangePct !== 0 && (
+                                <span className={`text-[10px] font-mono block ${getChangeColor(bc)}`}>
+                                  {change.balanceChangePct > 0 ? "+" : ""}{change.balanceChangePct}%
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </Link>
                     </TableCell>
                     <TableCell className="text-right hidden lg:table-cell">

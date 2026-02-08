@@ -468,6 +468,26 @@ export class DatabaseStorage implements IStorage {
 
   // ─── Analytics: Recent Address Entries ──────────────────────────────────
 
+  async getSnapshotClosestTo(targetTime: Date): Promise<Snapshot | undefined> {
+    // Find the snapshot with fetchedAt closest to targetTime
+    const targetIso = targetTime.toISOString();
+    const results = await db.execute(sql`
+      SELECT * FROM snapshots
+      ORDER BY ABS(EXTRACT(EPOCH FROM (fetched_at::timestamp - ${targetIso}::timestamp)))
+      LIMIT 1
+    `);
+    const row = results.rows[0] as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      date: row.date,
+      timeSlot: row.time_slot,
+      fetchedAt: row.fetched_at,
+      totalBalances: row.total_balances,
+      totalRichlist: row.total_richlist,
+    };
+  }
+
   async getRecentAddressEntries(
     address: string,
     limit: number

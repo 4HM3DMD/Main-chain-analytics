@@ -363,6 +363,83 @@ export async function registerRoutes(
    * GET /api/entities — Aggregate labeled addresses by entity (label name).
    * Groups all addresses with the same label into one entity view.
    */
+  /**
+   * GET /api/dashboard/changes?period=5m|1h|24h|7d|30d
+   * Returns balance changes for all current top-100 entries compared to a snapshot
+   * from the requested period ago. Returns a map of address -> { balanceChange, balanceChangePct, compareDate }.
+   */
+  app.get("/api/dashboard/changes", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || "5m";
+
+      // Calculate target time
+      let msAgo: number;
+      switch (period) {
+        case "1h": msAgo = 3600000; break;
+        case "24h": msAgo = 86400000; break;
+        case "7d": msAgo = 7 * 86400000; break;
+        case "30d": msAgo = 30 * 86400000; break;
+        default: msAgo = 0; // "5m" or "latest" = use pre-computed
+      }
+
+      const latestSnapshot = await storage.getLatestSnapshot();
+      if (!latestSnapshot) return res.json({ period, changes: {}, compareSnapshot: null });
+
+      // For "latest/5m", just return the pre-computed balanceChange from the current snapshot
+      if (msAgo === 0) {
+        const entries = await storage.getEntriesBySnapshotId(latestSnapshot.id);
+        const changes: Record<string, { balanceChange: number; balanceChangePct: number }> = {};
+        for (const e of entries) {
+          const bc = e.balanceChange || 0;
+          const prevBalance = e.balance - bc;
+          changes[e.address] = {
+            balanceChange: bc,
+            balanceChangePct: prevBalance > 0 ? Math.round((bc / prevBalance) * 10000) / 100 : 0,
+          };
+        }
+        return res.json({ period, changes, compareSnapshot: { date: latestSnapshot.date, timeSlot: latestSnapshot.timeSlot, label: "previous snapshot" } });
+      }
+
+      // Find the snapshot closest to the target time
+      const targetTime = new Date(Date.now() - msAgo);
+      const compareSnapshot = await storage.getSnapshotClosestTo(targetTime);
+      if (!compareSnapshot || compareSnapshot.id === latestSnapshot.id) {
+        return res.json({ period, changes: {}, compareSnapshot: null, message: "No comparison snapshot available for this period" });
+      }
+
+      const currentEntries = await storage.getEntriesBySnapshotId(latestSnapshot.id);
+      const compareEntries = await storage.getEntriesBySnapshotId(compareSnapshot.id);
+      const compareMap = new Map(compareEntries.map(e => [e.address, e]));
+
+      const changes: Record<string, { balanceChange: number; balanceChangePct: number }> = {};
+      for (const e of currentEntries) {
+        const prev = compareMap.get(e.address);
+        if (prev) {
+          const bc = e.balance - prev.balance;
+          changes[e.address] = {
+            balanceChange: bc,
+            balanceChangePct: prev.balance > 0 ? Math.round((bc / prev.balance) * 10000) / 100 : 0,
+          };
+        } else {
+          // New entry since comparison point
+          changes[e.address] = { balanceChange: e.balance, balanceChangePct: 100 };
+        }
+      }
+
+      res.json({
+        period,
+        changes,
+        compareSnapshot: {
+          date: compareSnapshot.date,
+          timeSlot: compareSnapshot.timeSlot,
+          label: period === "24h" ? "yesterday" : period === "7d" ? "7 days ago" : period === "30d" ? "30 days ago" : `${period} ago`,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/entities", async (_req, res) => {
     try {
       const latestSnapshot = await storage.getLatestSnapshot();

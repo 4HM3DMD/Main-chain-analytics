@@ -526,7 +526,9 @@ export async function registerRoutes(
         }
       }
 
+      // Only include entities that have at least one address in the current chain's snapshot
       const entities = Array.from(entityMap.values())
+        .filter(e => e.addresses.some(a => a.rank > 0))
         .sort((a, b) => b.totalBalance - a.totalBalance);
 
       const totalTop100 = entries.reduce((s, e) => s + e.balance, 0);

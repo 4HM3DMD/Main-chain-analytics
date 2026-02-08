@@ -345,6 +345,7 @@ export class DatabaseStorage implements IStorage {
           MIN(se.rank) AS best_rank
         FROM snapshot_entries se
         INNER JOIN snapshots s ON se.snapshot_id = s.id
+        WHERE s.chain = ${chain}
         GROUP BY se.address
       ),
       latest_entries AS (
@@ -356,6 +357,7 @@ export class DatabaseStorage implements IStorage {
         SELECT DISTINCT ON (se.address) se.address, se.rank AS last_rank, se.balance AS last_balance
         FROM snapshot_entries se
         INNER JOIN snapshots s ON se.snapshot_id = s.id
+        WHERE s.chain = ${chain}
         ORDER BY se.address, s.id DESC
       )
       SELECT

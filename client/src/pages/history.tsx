@@ -234,7 +234,7 @@ export default function History() {
                     <TableCell><RankMedal rank={e.rank} /></TableCell>
                     <TableCell><RankBadge rank={e.rank} rankChange={e.rankChange} /></TableCell>
                     <TableCell>
-                      <Link href={`/address/${e.address}`}>
+                      <Link href={`/${chain}/address/${e.address}`}>
                         <AddressDisplay address={e.address} label={e.label} category={e.category} showCopy={false} />
                       </Link>
                     </TableCell>

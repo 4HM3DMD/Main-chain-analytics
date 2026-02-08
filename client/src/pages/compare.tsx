@@ -182,7 +182,7 @@ export default function Compare() {
                           {row.toRank ? <RankMedal rank={row.toRank} /> : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell>
-                          <Link href={`/address/${row.address}`}>
+                          <Link href={`/${chain}/address/${row.address}`}>
                             <div className="flex items-center gap-2 cursor-pointer">
                               {row.label && (
                                 <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${getCategoryColor(row.category)}`}>

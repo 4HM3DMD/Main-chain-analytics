@@ -16,25 +16,26 @@ import { ChainSwitcher } from "@/components/chain-switcher";
 import { useChain } from "@/lib/chain-context";
 
 const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Shadow Entries", url: "/ghost-wallets", icon: Ghost },
-  { title: "Entities", url: "/entities", icon: Building2 },
-  { title: "Flows", url: "/flows", icon: Activity },
-  { title: "History", url: "/history", icon: Calendar },
-  { title: "Compare", url: "/compare", icon: ArrowLeftRight },
-  { title: "Movers", url: "/movers", icon: TrendingUp },
-  { title: "Hall of Fame", url: "/hall-of-fame", icon: Trophy },
+  { title: "Dashboard", path: "", icon: LayoutDashboard },
+  { title: "Analytics", path: "analytics", icon: BarChart3 },
+  { title: "Shadow Entries", path: "ghost-wallets", icon: Ghost },
+  { title: "Entities", path: "entities", icon: Building2 },
+  { title: "Flows", path: "flows", icon: Activity },
+  { title: "History", path: "history", icon: Calendar },
+  { title: "Compare", path: "compare", icon: ArrowLeftRight },
+  { title: "Movers", path: "movers", icon: TrendingUp },
+  { title: "Hall of Fame", path: "hall-of-fame", icon: Trophy },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { chainInfo } = useChain();
+  const { chain, chainInfo } = useChain();
+  const base = `/${chain}`;
 
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <Link href="/" data-testid="link-logo">
+        <Link href={base} data-testid="link-logo">
           <div className="flex items-center gap-2">
             <img src="/android-chrome-192x192.png" alt="" className="w-8 h-8 rounded-md" />
             <div>
@@ -60,11 +61,12 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
+                const href = item.path ? `${base}/${item.path}` : base;
+                const isActive = location === href || (item.path && location.startsWith(`${base}/${item.path}`));
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                      <Link href={href} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
                         <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
                       </Link>

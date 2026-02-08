@@ -94,8 +94,9 @@ export default function Dashboard() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"rank" | "change" | "supply">("rank");
   const [comparePeriod, setComparePeriod] = useState("5m");
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+  const topN = chainInfo.topN;
 
   const { data, isLoading, error, refetch } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
@@ -187,7 +188,7 @@ export default function Dashboard() {
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
-          title="Top 100 Balance"
+          title={`Top ${topN} Balance`}
           value={`${(totalBalance / 1000000).toFixed(2)}M`}
           subtitle={`${formatSupplyPct(totalBalance)} of total supply`}
           icon={Wallet}
@@ -273,7 +274,7 @@ export default function Dashboard() {
                 {dashboard.analytics.netFlow !== null ? formatCompact(dashboard.analytics.netFlow) : "—"}
               </p>
               <p className="text-[10px] text-muted-foreground">
-                Top 100 hold {formatSupplyPct(totalBalance)} of total supply
+                Top {topN} hold {formatSupplyPct(totalBalance)} of total supply
               </p>
             </CardContent>
           </Card>
@@ -322,7 +323,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-1">
             {significantMovers.map((m) => (
-              <Link key={m.address} href={`/address/${m.address}`}>
+              <Link key={m.address} href={`/${chain}/address/${m.address}`}>
                 <div className="flex items-center justify-between gap-3 p-2 rounded-md hover-elevate" data-testid={`alert-mover-${m.rank}`}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-mono text-muted-foreground">#{m.rank}</span>
@@ -352,7 +353,7 @@ export default function Dashboard() {
       <Card>
         <CardHeader className="pb-3 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">Top 100 Wallets</CardTitle>
+            <CardTitle className="text-base">Top {topN} Wallets</CardTitle>
             <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
               {filteredEntries.length}{categoryFilter !== "all" ? ` / ${dashboard.entries.length}` : ""} wallets
             </Badge>
@@ -431,12 +432,12 @@ export default function Dashboard() {
                     data-testid={`row-wallet-${entry.rank}`}
                   >
                     <TableCell className="text-center font-mono">
-                      <Link href={`/address/${entry.address}`}>
+                      <Link href={`/${chain}/address/${entry.address}`}>
                         <RankMedal rank={entry.rank} />
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/address/${entry.address}`}>
+                      <Link href={`/${chain}/address/${entry.address}`}>
                         <AddressDisplay
                           address={entry.address}
                           label={entry.label}
@@ -446,12 +447,12 @@ export default function Dashboard() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      <Link href={`/address/${entry.address}`}>
+                      <Link href={`/${chain}/address/${entry.address}`}>
                         {formatBalance(entry.balance)}
                       </Link>
                     </TableCell>
                     <TableCell className="text-right hidden md:table-cell">
-                      <Link href={`/address/${entry.address}`}>
+                      <Link href={`/${chain}/address/${entry.address}`}>
                         {(() => {
                           const change = getChange(entry.address, entry.balanceChange);
                           const bc = change.balanceChange;
@@ -472,7 +473,7 @@ export default function Dashboard() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-right hidden lg:table-cell">
-                      <Link href={`/address/${entry.address}`}>
+                      <Link href={`/${chain}/address/${entry.address}`}>
                         <div className="flex items-center justify-end gap-2">
                           <Progress value={Math.min((entry.percentage || 0) * 5, 100)} className="w-12 h-1.5" />
                           <span className="text-xs text-muted-foreground w-14 text-right">

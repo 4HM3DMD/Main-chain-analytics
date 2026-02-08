@@ -20,9 +20,12 @@ export interface EscFetchResult {
 
 const ESC_API_BASE = "https://esc.elastos.io/api/v2";
 
+/** ESC API returns at most 50 per page; we only track top 50. */
+const ESC_TOP_N = 50;
+
 /**
- * Fetch top 100 ESC addresses by native ELA balance.
- * Blockscout V2 returns 50 per page, so we fetch 2 pages.
+ * Fetch top 50 ESC addresses by native ELA balance.
+ * Blockscout V2 returns 50 per page; we use a single page and cap at 50.
  */
 export async function fetchEscRichList(): Promise<EscFetchResult> {
   const maxRetries = 3;
@@ -31,51 +34,30 @@ export async function fetchEscRichList(): Promise<EscFetchResult> {
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      log(`Fetching ESC richlist (attempt ${attempt}/${maxRetries})...`, "esc-fetcher");
+      log(`Fetching ESC richlist (top ${ESC_TOP_N}, attempt ${attempt}/${maxRetries})...`, "esc-fetcher");
 
-      const allItems: any[] = [];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      // Fetch pages using cursor-based pagination (Blockscout V2 uses next_page_params)
-      let nextPageParams: Record<string, string> | null = null;
+      const url = `${ESC_API_BASE}/addresses?type=base_address&sort=balance&order=desc`;
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
 
-      for (let page = 0; page < 2; page++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        let url = `${ESC_API_BASE}/addresses?type=base_address&sort=balance&order=desc`;
-        if (nextPageParams) {
-          const params = new URLSearchParams(nextPageParams);
-          url += `&${params.toString()}`;
-        }
-
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`ESC API HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (!data.items || !Array.isArray(data.items)) {
-          throw new Error("Invalid ESC API response: missing items array");
-        }
-
-        allItems.push(...data.items);
-        nextPageParams = data.next_page_params || null;
-        if (!nextPageParams) break; // No more pages
+      if (!response.ok) {
+        throw new Error(`ESC API HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Deduplicate by address (safety net)
-      const seen = new Set<string>();
-      const uniqueItems = allItems.filter(item => {
-        if (seen.has(item.hash)) return false;
-        seen.add(item.hash);
-        return true;
-      });
+      const data = await response.json();
+      if (!data.items || !Array.isArray(data.items)) {
+        throw new Error("Invalid ESC API response: missing items array");
+      }
+
+      // Single page only; cap at 50
+      const items = data.items.slice(0, ESC_TOP_N);
 
       // Convert Wei to ELA and compute total
       let totalSupply = 0;
-      const richlist: EscRichListItem[] = uniqueItems.slice(0, 100).map((item) => {
+      const richlist: EscRichListItem[] = items.map((item) => {
         const balanceWei = BigInt(item.coin_balance || "0");
         const balanceEla = Number(balanceWei) / 1e18;
         totalSupply += balanceEla;

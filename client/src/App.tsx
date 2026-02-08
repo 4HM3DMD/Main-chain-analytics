@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Router, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,11 +7,10 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ChainProvider, useChain } from "@/lib/chain-context";
+import { ChainFromUrl, useChain, isValidChain } from "@/lib/chain-context";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
 
 import Dashboard from "@/pages/dashboard";
 import Flows from "@/pages/flows";
@@ -25,19 +24,101 @@ import GhostWallets from "@/pages/ghost-wallets";
 import Entities from "@/pages/entities";
 import NotFound from "@/pages/not-found";
 
-function Router() {
+function RedirectToMainchain() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation("/mainchain");
+  }, [setLocation]);
+  return null;
+}
+
+function ChainGuard({
+  chain,
+  children,
+}: {
+  chain: string | undefined;
+  children: React.ReactNode;
+}) {
+  if (!isValidChain(chain)) return <NotFound />;
+  return <>{children}</>;
+}
+
+function Routes() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/analytics" component={Analytics} />
-      <Route path="/ghost-wallets" component={GhostWallets} />
-      <Route path="/entities" component={Entities} />
-      <Route path="/flows" component={Flows} />
-      <Route path="/history" component={History} />
-      <Route path="/compare" component={Compare} />
-      <Route path="/address/:address" component={AddressDetail} />
-      <Route path="/movers" component={Movers} />
-      <Route path="/hall-of-fame" component={HallOfFame} />
+      <Route path="/">
+        <RedirectToMainchain />
+      </Route>
+      <Route path="/:chain/address/:address">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <AddressDetail />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/analytics">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <Analytics />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/ghost-wallets">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <GhostWallets />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/entities">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <Entities />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/flows">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <Flows />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/history">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <History />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/compare">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <Compare />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/movers">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <Movers />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain/hall-of-fame">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <HallOfFame />
+          </ChainGuard>
+        )}
+      </Route>
+      <Route path="/:chain">
+        {(params) => (
+          <ChainGuard chain={params?.chain}>
+            <Dashboard />
+          </ChainGuard>
+        )}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -48,6 +129,7 @@ function HeaderSearch() {
   const [results, setResults] = useState<Array<{ address: string; label: string | null; category: string | null }>>([]);
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
+  const { chain } = useChain();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,7 +172,7 @@ function HeaderSearch() {
               key={r.address}
               className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
               onClick={() => {
-                navigate(`/address/${r.address}`);
+                navigate(`/${chain}/address/${r.address}`);
                 setOpen(false);
                 setQuery("");
               }}
@@ -107,12 +189,25 @@ function HeaderSearch() {
   );
 }
 
+function ChainStrip() {
+  const { chainInfo } = useChain();
+  const borderColor =
+    chainInfo.id === "mainchain" ? "border-blue-500" : chainInfo.id === "esc" ? "border-purple-500" : "border-amber-500";
+  return (
+    <div className={`border-l-4 ${borderColor} px-3 py-1.5 bg-muted/30 flex items-center gap-2 shrink-0`}>
+      <span className={`text-xs font-medium ${chainInfo.color}`}>{chainInfo.name}</span>
+    </div>
+  );
+}
+
 function HeaderBar() {
+  const { chainInfo } = useChain();
   return (
     <header className="flex items-center justify-between gap-2 p-3 border-b sticky top-0 z-50 bg-background/95 backdrop-blur">
       <div className="flex items-center gap-2">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
         <h1 className="text-sm font-semibold hidden sm:block">ELA Whale Tracker</h1>
+        <span className={`text-xs font-medium hidden md:inline ${chainInfo.color}`}>— {chainInfo.name}</span>
       </div>
       <div className="flex items-center gap-2">
         <HeaderSearch />
@@ -131,22 +226,25 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <ChainProvider>
-          <TooltipProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <HeaderBar />
-                  <main className="flex-1 overflow-y-auto">
-                    <Router />
-                  </main>
+        <Router>
+          <ChainFromUrl>
+            <TooltipProvider>
+              <SidebarProvider style={style as React.CSSProperties}>
+                <div className="flex h-screen w-full">
+                  <AppSidebar />
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <HeaderBar />
+                    <ChainStrip />
+                    <main className="flex-1 overflow-y-auto">
+                      <Routes />
+                    </main>
+                  </div>
                 </div>
-              </div>
-            </SidebarProvider>
-            <Toaster />
-          </TooltipProvider>
-        </ChainProvider>
+              </SidebarProvider>
+              <Toaster />
+            </TooltipProvider>
+          </ChainFromUrl>
+        </Router>
       </ThemeProvider>
     </QueryClientProvider>
   );

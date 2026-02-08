@@ -33,7 +33,8 @@ interface GhostWalletsData {
 
 export default function GhostWallets() {
   const [maxAppearances, setMaxAppearances] = useState(3);
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
+  const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading } = useQuery<GhostWalletsData>({
@@ -50,7 +51,7 @@ export default function GhostWallets() {
             Shadow Entries
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Wallets that briefly entered the top 100 then vanished — possible attempts to move large funds without sustained visibility.
+            Wallets that briefly entered the top {topN} then vanished — possible attempts to move large funds without sustained visibility.
           </p>
         </div>
         <div className="flex gap-1">
@@ -156,7 +157,7 @@ export default function GhostWallets() {
                       <TableRow key={g.address} className="cursor-pointer hover-elevate">
                         <TableCell className="text-center text-xs text-muted-foreground">{i + 1}</TableCell>
                         <TableCell>
-                          <Link href={`/address/${g.address}`}>
+                          <Link href={`/${chain}/address/${g.address}`}>
                             <div className="min-w-0">
                               {g.label && (
                                 <Badge variant="outline" className={`text-[10px] mr-1 no-default-hover-elevate no-default-active-elevate ${getCategoryColor(g.category)}`}>

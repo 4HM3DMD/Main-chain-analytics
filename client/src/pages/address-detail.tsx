@@ -74,12 +74,13 @@ const CATEGORIES = [
 ];
 
 export default function AddressDetail() {
-  const params = useParams<{ address: string }>();
+  const params = useParams<{ chain?: string; address: string }>();
   const address = params.address;
   const { toast } = useToast();
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [labelForm, setLabelForm] = useState({ label: "", category: "", notes: "" });
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
+  const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading, error } = useQuery<AddressData>({
@@ -164,7 +165,7 @@ export default function AddressDetail() {
             </Badge>
           ) : (
             <Badge variant="outline" className="text-muted-foreground no-default-hover-elevate no-default-active-elevate">
-              Not in Top 100
+              Not in Top {topN}
             </Badge>
           )}
         </div>
@@ -256,7 +257,7 @@ export default function AddressDetail() {
             <div>
               <p className="text-sm font-medium text-amber-400">Dormancy Detected</p>
               <p className="text-xs text-muted-foreground">
-                This wallet has been absent from the top 100 for {data.analytics.missedSnapshots} snapshots
+                This wallet has been absent from the top {topN} for {data.analytics.missedSnapshots} snapshots
                 out of {data.analytics.totalSnapshots} total.
               </p>
             </div>

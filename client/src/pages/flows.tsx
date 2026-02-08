@@ -78,7 +78,8 @@ const tickStyle = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
 const axisStroke = "hsl(var(--muted-foreground))";
 
 export default function Flows() {
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
+  const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading } = useQuery<FlowsData>({
@@ -140,9 +141,9 @@ export default function Flows() {
         </Card>
         <Card data-testid="card-concentration-top100">
           <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Top 100 Wallets</p>
+            <p className="text-xs text-muted-foreground mb-1">Top {topN} Wallets</p>
             <p className="text-2xl font-bold font-mono">{formatBalance(data.totalBalance)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Total ELA in top 100</p>
+            <p className="text-xs text-muted-foreground mt-1">Total ELA in top {topN}</p>
           </CardContent>
         </Card>
       </div>
@@ -282,7 +283,7 @@ export default function Flows() {
                 <Area
                   type="monotone"
                   dataKey="totalBalance"
-                  name="Top 100"
+                  name={`Top ${topN}`}
                   stroke="#6b7280"
                   fill="#6b7280"
                   fillOpacity={0.1}
@@ -322,7 +323,7 @@ export default function Flows() {
           </CardHeader>
           <CardContent className="space-y-2">
             {data.significantMovements.map((m) => (
-              <Link key={m.address} href={`/address/${m.address}`}>
+              <Link key={m.address} href={`/${chain}/address/${m.address}`}>
                 <div
                   className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate"
                   data-testid={`row-movement-${m.rank}`}

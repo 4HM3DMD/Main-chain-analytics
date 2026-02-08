@@ -32,7 +32,8 @@ interface EntitiesData {
 }
 
 export default function Entities() {
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
+  const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading } = useQuery<EntitiesData>({
@@ -66,7 +67,7 @@ export default function Entities() {
           Known Entities
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
-          Addresses grouped by entity. {activeEntities.length} entities active in top 100,
+          Addresses grouped by entity. {activeEntities.length} entities active in top {topN},
           holding {formatBalance(activeEntities.reduce((s, e) => s + e.totalBalance, 0))} ELA
           ({formatSupplyPct(activeEntities.reduce((s, e) => s + e.totalBalance, 0))} of total supply).
         </p>
@@ -110,7 +111,7 @@ export default function Entities() {
                   .filter(a => a.rank > 0)
                   .sort((a, b) => a.rank - b.rank)
                   .map((addr) => (
-                  <Link key={addr.address} href={`/address/${addr.address}`}>
+                  <Link key={addr.address} href={`/${chain}/address/${addr.address}`}>
                     <div className="flex items-center justify-between gap-2 p-1.5 rounded hover:bg-accent/50 transition-colors">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[10px] text-muted-foreground w-6">#{addr.rank}</span>
@@ -122,7 +123,7 @@ export default function Entities() {
                 ))}
                 {entity.addresses.filter(a => a.rank <= 0).length > 0 && (
                   <p className="text-[10px] text-muted-foreground italic">
-                    +{entity.addresses.filter(a => a.rank <= 0).length} not in top 100
+                    +{entity.addresses.filter(a => a.rank <= 0).length} not in top {topN}
                   </p>
                 )}
               </div>
@@ -136,7 +137,7 @@ export default function Entities() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">
-              Labeled but Not in Top 100 ({inactiveEntities.length})
+              Labeled but Not in Top {topN} ({inactiveEntities.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">

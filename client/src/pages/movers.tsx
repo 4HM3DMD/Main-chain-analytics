@@ -81,7 +81,7 @@ export default function Movers() {
                   <p className="text-sm text-muted-foreground text-center py-4">No data for this period</p>
                 ) : (
                   data.gainers.map((m, i) => (
-                    <Link key={m.address} href={`/address/${m.address}`}>
+                    <Link key={m.address} href={`/${chain}/address/${m.address}`}>
                       <div
                         className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate"
                         data-testid={`card-gainer-${i}`}
@@ -124,7 +124,7 @@ export default function Movers() {
                   <p className="text-sm text-muted-foreground text-center py-4">No data for this period</p>
                 ) : (
                   data.losers.map((m, i) => (
-                    <Link key={m.address} href={`/address/${m.address}`}>
+                    <Link key={m.address} href={`/${chain}/address/${m.address}`}>
                       <div
                         className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate"
                         data-testid={`card-loser-${i}`}

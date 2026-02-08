@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 
 export type Chain = "mainchain" | "esc" | "ethereum";
 
@@ -10,6 +11,8 @@ export interface ChainInfo {
   explorerUrl: string;
   color: string;
   hasSnapshots: boolean; // false for ethereum (no richlist API)
+  /** Number of top holders we track (e.g. 100 mainchain, 50 ESC). */
+  topN: number;
 }
 
 export const CHAINS: Record<Chain, ChainInfo> = {
@@ -20,6 +23,7 @@ export const CHAINS: Record<Chain, ChainInfo> = {
     explorerUrl: "https://blockchain.elastos.io/address",
     color: "text-blue-400",
     hasSnapshots: true,
+    topN: 100,
   },
   esc: {
     id: "esc",
@@ -28,6 +32,7 @@ export const CHAINS: Record<Chain, ChainInfo> = {
     explorerUrl: "https://esc.elastos.io/address",
     color: "text-purple-400",
     hasSnapshots: true,
+    topN: 50,
   },
   ethereum: {
     id: "ethereum",
@@ -36,8 +41,14 @@ export const CHAINS: Record<Chain, ChainInfo> = {
     explorerUrl: "https://etherscan.io/address",
     color: "text-amber-400",
     hasSnapshots: false,
+    topN: 100,
   },
 };
+
+export const VALID_CHAINS: Chain[] = ["mainchain", "esc", "ethereum"];
+export function isValidChain(s: string | undefined): s is Chain {
+  return s !== undefined && VALID_CHAINS.includes(s as Chain);
+}
 
 interface ChainContextType {
   chain: Chain;
@@ -59,12 +70,40 @@ export function ChainProvider({ children }: { children: ReactNode }) {
 
   const setChain = useCallback((newChain: Chain) => {
     setChainState(newChain);
-    // Clear all cached data so stale chain data doesn't persist
     queryClient.clear();
   }, [queryClient]);
 
   const chainInfo = CHAINS[chain];
   const chainParam = chain === "mainchain" ? "" : `?chain=${chain}`;
+
+  return (
+    <ChainContext.Provider value={{ chain, chainInfo, setChain, chainParam }}>
+      {children}
+    </ChainContext.Provider>
+  );
+}
+
+/**
+ * URL-driven chain: chain is read from the first path segment (e.g. /esc/analytics → esc).
+ * setChain(c) navigates to /:chain and clears cache. Use with routes like /:chain, /:chain/analytics.
+ * Must be rendered inside wouter's Router.
+ */
+export function ChainFromUrl({ children }: { children: ReactNode }) {
+  const [pathname, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+
+  const pathChain = pathname === "/" ? "" : pathname.split("/").filter(Boolean)[0];
+  const chain: Chain = pathChain === "esc" || pathChain === "ethereum" ? pathChain : "mainchain";
+  const chainInfo = CHAINS[chain];
+  const chainParam = chain === "mainchain" ? "" : `?chain=${chain}`;
+
+  const setChain = useCallback(
+    (newChain: Chain) => {
+      queryClient.clear();
+      setLocation(`/${newChain}`);
+    },
+    [queryClient, setLocation]
+  );
 
   return (
     <ChainContext.Provider value={{ chain, chainInfo, setChain, chainParam }}>

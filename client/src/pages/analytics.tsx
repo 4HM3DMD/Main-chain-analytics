@@ -173,7 +173,8 @@ export default function Analytics() {
   const [trendFilter, setTrendFilter] = useState<string | null>(null);
   const [streakType, setStreakType] = useState<"rank" | "balance">("rank");
   const [ghostMaxAppearances, setGhostMaxAppearances] = useState(3);
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
+  const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewData>({
@@ -314,7 +315,7 @@ export default function Analytics() {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Layers className="w-4 h-4 text-purple-400" />
-                      <p className="text-xs text-muted-foreground">Supply Held by Top 100</p>
+                      <p className="text-xs text-muted-foreground">Supply Held by Top {topN}</p>
                     </div>
                     <p className="text-2xl font-bold font-mono">
                       {overview.current?.totalBalance
@@ -468,7 +469,7 @@ export default function Analytics() {
                 Shadow Entries
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Wallets that briefly entered the top 100 then vanished — possible attempts to move large funds without sustained visibility.
+                Wallets that briefly entered the top {topN} then vanished — possible attempts to move large funds without sustained visibility.
               </p>
             </div>
             <div className="flex gap-1">
@@ -545,7 +546,7 @@ export default function Analytics() {
                           <TableRow key={g.address} className="cursor-pointer hover-elevate">
                             <TableCell className="text-center text-xs text-muted-foreground">{i + 1}</TableCell>
                             <TableCell>
-                              <Link href={`/address/${g.address}`}>
+                              <Link href={`/${chain}/address/${g.address}`}>
                                 <div className="min-w-0">
                                   {g.label && (
                                     <Badge variant="outline" className={`text-[10px] mr-1 no-default-hover-elevate no-default-active-elevate ${getCategoryColor(g.category)}`}>
@@ -710,10 +711,10 @@ export default function Analytics() {
                           .map((w) => (
                           <TableRow key={w.address} className="cursor-pointer hover-elevate">
                             <TableCell className="text-center font-mono text-sm">
-                              <Link href={`/address/${w.address}`}>{w.rank}</Link>
+                              <Link href={`/${chain}/address/${w.address}`}>{w.rank}</Link>
                             </TableCell>
                             <TableCell>
-                              <Link href={`/address/${w.address}`}>
+                              <Link href={`/${chain}/address/${w.address}`}>
                                 <div className="min-w-0">
                                   {w.label && (
                                     <Badge variant="outline" className={`text-[10px] mr-1 no-default-hover-elevate no-default-active-elevate ${getCategoryColor(w.category)}`}>
@@ -730,7 +731,7 @@ export default function Analytics() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs">
-                              <Link href={`/address/${w.address}`}>{formatBalance(w.balance)}</Link>
+                              <Link href={`/${chain}/address/${w.address}`}>{formatBalance(w.balance)}</Link>
                             </TableCell>
                             <TableCell className={`text-center font-mono text-xs hidden md:table-cell ${getStreakColor(w.balanceStreak)}`}>
                               {formatStreak(w.balanceStreak)}
@@ -787,7 +788,7 @@ export default function Analytics() {
                     .filter(l => (l.streak || 0) > 0)
                     .slice(0, 10)
                     .map((l, i) => (
-                    <Link key={l.address} href={`/address/${l.address}`}>
+                    <Link key={l.address} href={`/${chain}/address/${l.address}`}>
                       <div className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className="text-sm font-bold text-muted-foreground w-6">{i + 1}</span>
@@ -826,7 +827,7 @@ export default function Analytics() {
                     .filter(l => (l.streak || 0) < 0)
                     .slice(0, 10)
                     .map((l, i) => (
-                    <Link key={l.address} href={`/address/${l.address}`}>
+                    <Link key={l.address} href={`/${chain}/address/${l.address}`}>
                       <div className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className="text-sm font-bold text-muted-foreground w-6">{i + 1}</span>
@@ -863,7 +864,7 @@ export default function Analytics() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <ArrowUpDown className="w-4 h-4 text-emerald-400" />
-                    Net Flow History (ELA In/Out of Top 100)
+                    Net Flow History (ELA In/Out of Top {topN})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -930,7 +931,7 @@ export default function Analytics() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Flame className="w-4 h-4 text-amber-400" />
-                  Wallets with Gaps in Top 100 Presence
+                  Wallets with Gaps in Top {topN} Presence
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -950,7 +951,7 @@ export default function Analytics() {
                       {dormant.wallets.map((w) => (
                         <TableRow key={w.address} className="cursor-pointer hover-elevate">
                           <TableCell>
-                            <Link href={`/address/${w.address}`}>
+                            <Link href={`/${chain}/address/${w.address}`}>
                               <div className="min-w-0">
                                 {w.label && (
                                   <Badge variant="outline" className={`text-[10px] mr-1 no-default-hover-elevate no-default-active-elevate ${getCategoryColor(w.category)}`}>

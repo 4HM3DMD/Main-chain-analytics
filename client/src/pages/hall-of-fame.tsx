@@ -186,7 +186,7 @@ export default function HallOfFame() {
                         {filtered.map((e) => (
                           <TableRow key={e.address} className="hover-elevate cursor-pointer" data-testid={`row-hall-${e.address.slice(0, 8)}`}>
                             <TableCell className="max-w-[300px]">
-                              <Link href={`/address/${e.address}`}>
+                              <Link href={`/${chain}/address/${e.address}`}>
                                 <div className="space-y-0.5">
                                   {e.label && (
                                     <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${getCategoryColor(e.category)}`}>

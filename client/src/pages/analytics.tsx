@@ -159,7 +159,11 @@ const tooltipStyle = {
   border: "1px solid hsl(var(--border))",
   borderRadius: "6px",
   fontSize: "12px",
+  color: "hsl(var(--foreground))",
 };
+
+const tickStyle = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
+const axisStroke = "hsl(var(--muted-foreground))";
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -337,9 +341,9 @@ export default function Analytics() {
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={overview.history} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v.slice(5)} />
-                        <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" domain={["auto", "auto"]} />
-                        <Tooltip contentStyle={tooltipStyle} labelFormatter={(l) => `Date: ${l}`} />
+                        <XAxis dataKey="date" tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => v.slice(5)} />
+                        <YAxis tick={tickStyle} stroke={axisStroke} domain={["auto", "auto"]} />
+                        <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} labelFormatter={(l) => `Date: ${l}`} />
                         <Line type="monotone" dataKey="giniCoefficient" name="Gini" stroke="#3b82f6" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -361,9 +365,9 @@ export default function Analytics() {
                       <ResponsiveContainer width="100%" height={250}>
                         <AreaChart data={overview.history} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                          <Tooltip contentStyle={tooltipStyle} labelFormatter={(l) => `Date: ${l}`} />
+                          <XAxis dataKey="date" tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => v.slice(5)} />
+                          <YAxis tick={tickStyle} stroke={axisStroke} />
+                          <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} labelFormatter={(l) => `Date: ${l}`} />
                           <Area type="monotone" dataKey="whaleActivityIndex" name="WAI" stroke="#f59e0b" fill="#f59e0b20" strokeWidth={2} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -381,13 +385,13 @@ export default function Analytics() {
                       <ResponsiveContainer width="100%" height={250}>
                         <AreaChart data={overview.history} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(1)}%`, ""]} labelFormatter={(l) => `Date: ${l}`} />
+                          <XAxis dataKey="date" tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => v.slice(5)} />
+                          <YAxis tick={tickStyle} stroke={axisStroke} unit="%" />
+                          <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} formatter={(v: number) => [`${v.toFixed(1)}%`, ""]} labelFormatter={(l) => `Date: ${l}`} />
                           <Area type="monotone" dataKey="top10Pct" name="Top 10" stroke="#3b82f6" fill="#3b82f620" strokeWidth={2} />
                           <Area type="monotone" dataKey="top20Pct" name="Top 20" stroke="#8b5cf6" fill="#8b5cf620" strokeWidth={1.5} />
                           <Area type="monotone" dataKey="top50Pct" name="Top 50" stroke="#6b7280" fill="#6b728010" strokeWidth={1} />
-                          <Legend wrapperStyle={{ fontSize: "11px" }} />
+                          <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--foreground))" }} />
                         </AreaChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -863,16 +867,17 @@ export default function Analytics() {
                   <ResponsiveContainer width="100%" height={350}>
                     <BarChart data={netFlows.flows} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v.slice(5)} />
-                      <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatCompact(v)} />
+                      <XAxis dataKey="date" tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => v.slice(5)} />
+                      <YAxis tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => formatCompact(v)} />
                       <Tooltip
                         contentStyle={tooltipStyle}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
                         formatter={(value: number, name: string) => [formatBalance(value) + " ELA", name]}
                         labelFormatter={(l) => `Date: ${l}`}
                       />
                       <Bar dataKey="totalInflow" name="Inflow" fill="#22c55e" radius={[2, 2, 0, 0]} />
                       <Bar dataKey="totalOutflow" name="Outflow" fill="#ef4444" radius={[2, 2, 0, 0]} />
-                      <Legend wrapperStyle={{ fontSize: "11px" }} />
+                      <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--foreground))" }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -889,9 +894,9 @@ export default function Analytics() {
                   <ResponsiveContainer width="100%" height={250}>
                     <AreaChart data={netFlows.flows} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v.slice(5)} />
-                      <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatCompact(v)} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBalance(v) + " ELA", "Net Flow"]} />
+                      <XAxis dataKey="date" tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => v.slice(5)} />
+                      <YAxis tick={tickStyle} stroke={axisStroke} tickFormatter={(v) => formatCompact(v)} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} formatter={(v: number) => [formatBalance(v) + " ELA", "Net Flow"]} />
                       <Area
                         type="monotone"
                         dataKey="netFlow"

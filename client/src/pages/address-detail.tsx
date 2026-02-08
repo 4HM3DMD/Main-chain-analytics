@@ -270,14 +270,15 @@ export default function AddressDetail() {
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={rankData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis reversed domain={[1, 100]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis reversed domain={[1, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "6px",
                     fontSize: "12px",
+                    color: "hsl(var(--foreground))",
                   }}
                   labelStyle={{ color: "hsl(var(--foreground))" }}
                 />
@@ -297,14 +298,15 @@ export default function AddressDetail() {
             <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={balanceData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "6px",
                     fontSize: "12px",
+                    color: "hsl(var(--foreground))",
                   }}
                   formatter={(value: number) => [formatBalance(value), "Balance"]}
                   labelStyle={{ color: "hsl(var(--foreground))" }}

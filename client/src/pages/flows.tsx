@@ -70,7 +70,11 @@ const tooltipStyle = {
   border: "1px solid hsl(var(--border))",
   borderRadius: "6px",
   fontSize: "12px",
+  color: "hsl(var(--foreground))",
 };
+
+const tickStyle = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
+const axisStroke = "hsl(var(--muted-foreground))";
 
 export default function Flows() {
   const { data, isLoading } = useQuery<FlowsData>({
@@ -168,7 +172,7 @@ export default function Flows() {
                   formatter={(value: number) => [formatBalance(value) + " ELA", "Balance"]}
                 />
                 <Legend
-                  wrapperStyle={{ fontSize: "11px" }}
+                  wrapperStyle={{ fontSize: "11px", color: "hsl(var(--foreground))" }}
                   formatter={(value) => <span className="text-xs">{value}</span>}
                 />
               </PieChart>
@@ -219,7 +223,7 @@ export default function Flows() {
                   formatter={(value: number) => [formatBalance(value) + " ELA", "Balance"]}
                 />
                 <Legend
-                  wrapperStyle={{ fontSize: "11px" }}
+                  wrapperStyle={{ fontSize: "11px", color: "hsl(var(--foreground))" }}
                   formatter={(value) => <span className="text-xs">{value}</span>}
                 />
               </PieChart>
@@ -256,17 +260,18 @@ export default function Flows() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 10 }}
-                  stroke="hsl(var(--muted-foreground))"
+                  tick={tickStyle}
+                  stroke={axisStroke}
                   tickFormatter={(v) => v.slice(5)}
                 />
                 <YAxis
-                  tick={{ fontSize: 10 }}
-                  stroke="hsl(var(--muted-foreground))"
+                  tick={tickStyle}
+                  stroke={axisStroke}
                   tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
                   formatter={(value: number, name: string) => [formatBalance(value) + " ELA", name]}
                   labelFormatter={(label) => `Date: ${label}`}
                 />

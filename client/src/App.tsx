@@ -11,7 +11,10 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Camera, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Camera, RefreshCw, Search } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 
 import Dashboard from "@/pages/dashboard";
 import Flows from "@/pages/flows";
@@ -20,12 +23,18 @@ import Compare from "@/pages/compare";
 import AddressDetail from "@/pages/address-detail";
 import Movers from "@/pages/movers";
 import HallOfFame from "@/pages/hall-of-fame";
+import Analytics from "@/pages/analytics";
+import GhostWallets from "@/pages/ghost-wallets";
+import Entities from "@/pages/entities";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/analytics" component={Analytics} />
+      <Route path="/ghost-wallets" component={GhostWallets} />
+      <Route path="/entities" component={Entities} />
       <Route path="/flows" component={Flows} />
       <Route path="/history" component={History} />
       <Route path="/compare" component={Compare} />
@@ -34,6 +43,70 @@ function Router() {
       <Route path="/hall-of-fame" component={HallOfFame} />
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function HeaderSearch() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Array<{ address: string; label: string | null; category: string | null }>>([]);
+  const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (query.length < 3) { setResults([]); return; }
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        setResults(data.results || []);
+        setOpen(true);
+      } catch { setResults([]); }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <Input
+          placeholder="Search address or label..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          className="pl-8 h-8 w-44 sm:w-56 text-xs"
+        />
+      </div>
+      {open && results.length > 0 && (
+        <div className="absolute top-full mt-1 right-0 w-80 bg-popover border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
+          {results.map((r) => (
+            <button
+              key={r.address}
+              className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-0"
+              onClick={() => {
+                navigate(`/address/${r.address}`);
+                setOpen(false);
+                setQuery("");
+              }}
+            >
+              {r.label && (
+                <span className="text-xs font-medium block">{r.label}</span>
+              )}
+              <span className="text-xs font-mono text-muted-foreground">{r.address}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -62,6 +135,7 @@ function HeaderBar() {
         <h1 className="text-sm font-semibold hidden sm:block">ELA Whale Tracker</h1>
       </div>
       <div className="flex items-center gap-2">
+        <HeaderSearch />
         <Button
           variant="secondary"
           size="sm"

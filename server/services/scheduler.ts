@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { fetchRichList } from "./fetcher";
-import { analyzeSnapshot } from "./analyzer";
+import { analyzeSnapshot, type AddressHistoryMap } from "./analyzer";
+import { buildConcentrationMetrics } from "./analytics";
 import { storage } from "../storage";
 import { log } from "../index";
 
@@ -16,6 +17,31 @@ function getTodayDate(): string {
 
 export async function triggerManualSnapshot(): Promise<any> {
   return takeSnapshot("manual");
+}
+
+/**
+ * Build address history map for computing advanced per-entry metrics.
+ * Fetches the last N entries for each address in the current richlist.
+ */
+async function buildAddressHistoryMap(
+  addresses: string[],
+  windowSize: number = 30
+): Promise<AddressHistoryMap> {
+  const historyMap: AddressHistoryMap = {};
+
+  // Batch fetch recent entries for all current addresses
+  for (const address of addresses) {
+    try {
+      const entries = await storage.getRecentAddressEntries(address, windowSize);
+      if (entries.length > 0) {
+        historyMap[address] = entries;
+      }
+    } catch {
+      // Skip if address has no history yet
+    }
+  }
+
+  return historyMap;
 }
 
 async function takeSnapshot(trigger: string = "cron"): Promise<any> {
@@ -48,7 +74,16 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
       totalRichlist: fetchResult.richlist.length,
     });
 
-    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, tempSnapshot.id);
+    // Build address history for advanced analytics (streaks, volatility, trends)
+    const addresses = fetchResult.richlist.map(r => r.address);
+    let addressHistory: AddressHistoryMap | undefined;
+    try {
+      addressHistory = await buildAddressHistoryMap(addresses);
+    } catch (err: any) {
+      log(`Warning: Could not build address history: ${err.message}`, "scheduler");
+    }
+
+    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, tempSnapshot.id, addressHistory);
 
     await storage.insertSnapshotEntries(analysis.entries);
     const snapshot = { ...tempSnapshot, totalBalances: fetchResult.totalBalances };
@@ -63,6 +98,23 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
       biggestLoserChange: analysis.biggestLoser?.change || null,
     });
 
+    // ─── Compute & Store Concentration Metrics ─────────────────────────
+    try {
+      const storedEntries = await storage.getEntriesBySnapshotId(tempSnapshot.id);
+      const metrics = buildConcentrationMetrics(
+        tempSnapshot.id,
+        date,
+        timeSlot,
+        storedEntries,
+        analysis.newEntries.length,
+        analysis.dropouts.length
+      );
+      await storage.insertConcentrationMetrics(metrics);
+      log(`Concentration metrics computed: Gini=${metrics.giniCoefficient?.toFixed(4)}, WAI=${metrics.whaleActivityIndex}`, "scheduler");
+    } catch (err: any) {
+      log(`Warning: Could not compute concentration metrics: ${err.message}`, "scheduler");
+    }
+
     log(`Snapshot ${snapshot.id} completed: ${analysis.entries.length} entries, ${analysis.newEntries.length} new, ${analysis.dropouts.length} dropouts`, "scheduler");
 
     return snapshot;
@@ -72,10 +124,78 @@ async function takeSnapshot(trigger: string = "cron"): Promise<any> {
   }
 }
 
+/**
+ * Compute weekly summary from concentration_metrics data.
+ * Called every Sunday midnight UTC.
+ */
+async function computeWeeklySummary(): Promise<void> {
+  try {
+    const now = new Date();
+    // Last Sunday (end of previous week)
+    const dayOfWeek = now.getUTCDay();
+    const lastSunday = new Date(now);
+    lastSunday.setUTCDate(now.getUTCDate() - dayOfWeek);
+    const weekEnd = lastSunday.toISOString().split("T")[0];
+
+    // Monday of the same week
+    const lastMonday = new Date(lastSunday);
+    lastMonday.setUTCDate(lastSunday.getUTCDate() - 6);
+    const weekStart = lastMonday.toISOString().split("T")[0];
+
+    log(`Computing weekly summary for ${weekStart} to ${weekEnd}`, "scheduler");
+
+    const metrics = await storage.getConcentrationByDateRange(weekStart, weekEnd);
+    if (metrics.length === 0) {
+      log("No concentration metrics found for the week, skipping", "scheduler");
+      return;
+    }
+
+    const firstMetric = metrics[0];
+    const lastMetric = metrics[metrics.length - 1];
+
+    const avgWAI = metrics.reduce((s, m) => s + (m.whaleActivityIndex || 0), 0) / metrics.length;
+    const totalNetFlow = metrics.reduce((s, m) => s + (m.netFlow || 0), 0);
+    const totalNew = metrics.reduce((s, m) => s + (m.newEntryCount || 0), 0);
+    const totalDropouts = metrics.reduce((s, m) => s + (m.dropoutCount || 0), 0);
+    const avgVolatility = metrics.reduce((s, m) => s + (m.avgRankChange || 0), 0) / metrics.length;
+
+    // Find top accumulator/distributor from movers endpoint logic
+    const moverData = await storage.getMovers(weekStart, weekEnd);
+
+    await storage.upsertWeeklySummary({
+      weekStart,
+      weekEnd,
+      giniStart: firstMetric.giniCoefficient,
+      giniEnd: lastMetric.giniCoefficient,
+      giniChange: (lastMetric.giniCoefficient || 0) - (firstMetric.giniCoefficient || 0),
+      totalBalanceStart: firstMetric.totalBalance,
+      totalBalanceEnd: lastMetric.totalBalance,
+      netFlowTotal: Math.round(totalNetFlow * 100) / 100,
+      avgWhaleActivityIndex: Math.round(avgWAI * 100) / 100,
+      totalNewEntries: totalNew,
+      totalDropouts,
+      topAccumulatorAddress: moverData.gainers[0]?.address || null,
+      topAccumulatorChange: moverData.gainers[0]?.balanceChange || null,
+      topDistributorAddress: moverData.losers[0]?.address || null,
+      topDistributorChange: moverData.losers[0]?.balanceChange || null,
+      avgRankVolatility: Math.round(avgVolatility * 100) / 100,
+      snapshotCount: metrics.length,
+    });
+
+    log(`Weekly summary computed for ${weekStart}: ${metrics.length} snapshots, Gini ${firstMetric.giniCoefficient?.toFixed(4)} -> ${lastMetric.giniCoefficient?.toFixed(4)}`, "scheduler");
+  } catch (error: any) {
+    log(`Weekly summary failed: ${error.message}`, "scheduler");
+  }
+}
+
 export function startScheduler(): void {
+  // Snapshot every 2 hours
   cron.schedule("0 */2 * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
 
-  log("Scheduler started: snapshots every 2 hours UTC (00, 02, 04, ..., 22)", "scheduler");
+  // Weekly summary every Sunday at 23:59 UTC
+  cron.schedule("59 23 * * 0", () => computeWeeklySummary(), { timezone: "UTC" });
+
+  log("Scheduler started: snapshots every 2h UTC, weekly summary Sundays 23:59 UTC", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {

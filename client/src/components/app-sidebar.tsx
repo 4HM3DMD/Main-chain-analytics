@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity } from "lucide-react";
+import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity, BarChart3, Ghost, Building2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +15,9 @@ import {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Shadow Entries", url: "/ghost-wallets", icon: Ghost },
+  { title: "Entities", url: "/entities", icon: Building2 },
   { title: "Flows", url: "/flows", icon: Activity },
   { title: "History", url: "/history", icon: Calendar },
   { title: "Compare", url: "/compare", icon: ArrowLeftRight },
@@ -30,9 +33,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <Link href="/" data-testid="link-logo">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">ELA</span>
-            </div>
+            <img src="/android-chrome-192x192.png" alt="" className="w-8 h-8 rounded-md" />
             <div>
               <h1 className="text-sm font-semibold leading-tight">ELA Whale Tracker</h1>
               <p className="text-xs text-muted-foreground leading-tight">Top 100 Wallets</p>

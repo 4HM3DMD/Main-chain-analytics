@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, PieChart as PieChartIcon, TrendingUp, TrendingDown, AlertTriangle, Layers } from "lucide-react";
-import { formatBalance, formatBalanceChange, truncateAddress, getCategoryColor } from "@/lib/utils";
+import { formatBalance, formatBalanceChange, truncateAddress, getCategoryColor, getChangeColor } from "@/lib/utils";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -49,6 +49,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   dao: "#a855f7",
   exchange: "#f97316",
   burn: "#eab308",
+  ef: "#22d3ee",
+  whale: "#f472b6",
   unknown: "#6b7280",
 };
 
@@ -58,6 +60,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   dao: "DAO / Treasury",
   exchange: "Exchanges",
   burn: "Burn Addresses",
+  ef: "Elastos Foundation",
+  whale: "Known Whales",
   unknown: "Unknown Wallets",
 };
 
@@ -329,10 +333,10 @@ export default function Flows() {
                     <div className="flex items-center gap-1 justify-end">
                       {m.balanceChange > 0 ? (
                         <TrendingUp className="w-3 h-3 text-emerald-400" />
-                      ) : (
+                      ) : m.balanceChange < 0 ? (
                         <TrendingDown className="w-3 h-3 text-red-400" />
-                      )}
-                      <span className={`text-sm font-mono ${m.balanceChange > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      ) : null}
+                      <span className={`text-sm font-mono ${getChangeColor(m.balanceChange)}`}>
                         {formatBalanceChange(m.balanceChange)}
                       </span>
                     </div>

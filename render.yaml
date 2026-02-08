@@ -1,0 +1,20 @@
+databases:
+  - name: wallet-tracker-db
+    plan: basic-256mb
+    databaseName: wallet_tracker
+    postgresMajorVersion: "15"
+
+services:
+  - type: web
+    name: wallet-tracker
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build && npm run db:push
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wallet-tracker-db
+          property: connectionString

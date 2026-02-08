@@ -44,6 +44,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   sidechain: "#3b82f6",
   pool: "#22c55e",
   dao: "#a855f7",
+  exchange: "#f97316",
+  ef: "#22d3ee",
+  whale: "#f472b6",
   unknown: "#64748b",
 };
 

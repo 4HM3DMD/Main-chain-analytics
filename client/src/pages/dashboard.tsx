@@ -1,14 +1,14 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Camera, Clock, Database, Users, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, TrendingDown, AlertTriangle, Gauge, Zap, ArrowUpDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
-import { RankBadge, RankMedal } from "@/components/rank-badge";
+import { RankMedal } from "@/components/rank-badge";
 import { AddressDisplay } from "@/components/address-display";
-import { formatBalance, formatBalanceChange, formatPercentage, timeAgo, truncateAddress } from "@/lib/utils";
+import { formatBalance, formatBalanceChange, formatPercentage, timeAgo, truncateAddress, formatWAI, getWAIColor, getWAILevel, formatCompact, getChangeColor, getWealthSpreadLevel, getWealthSpreadPct, formatSupplyPct, ELA_TOTAL_SUPPLY } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -44,6 +44,15 @@ interface DashboardData {
     uniqueAddresses: number;
     firstSnapshotDate: string | null;
   };
+  analytics: {
+    giniCoefficient: number | null;
+    hhi: number | null;
+    whaleActivityIndex: number | null;
+    netFlow: number | null;
+    activeWallets: number | null;
+    top10Pct: number | null;
+    top20Pct: number | null;
+  } | null;
   summaries: Array<{
     date: string;
     newEntries: string;
@@ -142,7 +151,7 @@ export default function Dashboard() {
         <StatCard
           title="Top 100 Balance"
           value={`${(totalBalance / 1000000).toFixed(2)}M`}
-          subtitle="Total ELA in top 100"
+          subtitle={`${formatSupplyPct(totalBalance)} of total supply`}
           icon={Wallet}
           iconColor="text-blue-400"
         />
@@ -173,6 +182,65 @@ export default function Dashboard() {
           iconColor="text-amber-400"
         />
       </div>
+
+      {/* Analytics Indicators */}
+      {dashboard.analytics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Wealth Spread — plain-English replacement for Gini */}
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Gauge className="w-4 h-4 text-blue-400" />
+                <p className="text-xs text-muted-foreground">Wealth Spread</p>
+              </div>
+              <p className="text-sm font-semibold">{getWealthSpreadLevel(dashboard.analytics.giniCoefficient)}</p>
+              <div className="mt-2">
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${getWealthSpreadPct(dashboard.analytics.giniCoefficient)}%`,
+                      background: `linear-gradient(90deg, #22c55e, #eab308 50%, #ef4444)`,
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                  <span>Spread Out</span>
+                  <span>Concentrated</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          {/* Whale Activity */}
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-amber-400" />
+                <p className="text-xs text-muted-foreground">Whale Activity</p>
+              </div>
+              <p className={`text-lg font-bold font-mono ${getWAIColor(dashboard.analytics.whaleActivityIndex)}`}>
+                {formatWAI(dashboard.analytics.whaleActivityIndex)}
+              </p>
+              <p className="text-[10px] text-muted-foreground">{getWAILevel(dashboard.analytics.whaleActivityIndex)}</p>
+            </CardContent>
+          </Card>
+          {/* Net Flow */}
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowUpDown className="w-4 h-4 text-emerald-400" />
+                <p className="text-xs text-muted-foreground">Net Flow</p>
+              </div>
+              <p className={`text-lg font-bold font-mono ${getChangeColor(dashboard.analytics.netFlow)}`}>
+                {dashboard.analytics.netFlow !== null ? formatCompact(dashboard.analytics.netFlow) : "—"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Top 100 hold {formatSupplyPct(totalBalance)} of total supply
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {(newEntries.length > 0 || dropouts.length > 0) && (
         <Card>
@@ -229,10 +297,10 @@ export default function Dashboard() {
                   <div className="flex items-center gap-1 shrink-0">
                     {m.balanceChange! > 0 ? (
                       <TrendingUp className="w-3 h-3 text-emerald-400" />
-                    ) : (
+                    ) : m.balanceChange! < 0 ? (
                       <TrendingDown className="w-3 h-3 text-red-400" />
-                    )}
-                    <span className={`text-xs font-mono ${m.balanceChange! > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    ) : null}
+                    <span className={`text-xs font-mono ${getChangeColor(m.balanceChange)}`}>
                       {formatBalanceChange(m.balanceChange!)}
                     </span>
                   </div>
@@ -258,10 +326,9 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-14 text-center">#</TableHead>
-                  <TableHead className="w-16 text-center">Change</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead className="text-right">Balance (ELA)</TableHead>
-                  <TableHead className="text-right hidden md:table-cell">Change</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">ELA Change</TableHead>
                   <TableHead className="text-right hidden lg:table-cell">% Supply</TableHead>
                 </TableRow>
               </TableHeader>
@@ -275,15 +342,6 @@ export default function Dashboard() {
                     <TableCell className="text-center font-mono">
                       <Link href={`/address/${entry.address}`}>
                         <RankMedal rank={entry.rank} />
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Link href={`/address/${entry.address}`}>
-                        <RankBadge
-                          rank={entry.rank}
-                          rankChange={entry.rankChange}
-                          isNew={entry.prevRank === null && entry.rankChange === null}
-                        />
                       </Link>
                     </TableCell>
                     <TableCell>

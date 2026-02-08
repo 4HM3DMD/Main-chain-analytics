@@ -1,6 +1,38 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Database
+*.sql
+migrations/
+
+# OS
 .DS_Store
-server/public
+Thumbs.db
+
+# Replit artifacts (not needed for Render)
+.local/
+.replit
+replit.md
+attached_assets/
+generated-icon.png
+
+# IDE
+.vscode/
+.idea/
+
+# Vite
 vite.config.ts.*
+
+# Misc
 *.tar.gz
+*.log
+PROGRESS.md

@@ -16,6 +16,8 @@ interface Mover {
   label: string | null;
   category: string | null;
   balanceChange: number;
+  balanceChangePct: number;
+  currentBalance: number;
   currentRank: number | null;
   rankChange: number | null;
 }
@@ -94,7 +96,11 @@ export default function Movers() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-mono text-emerald-400">{formatBalanceChange(m.balanceChange)}</p>
-                          {m.currentRank && <p className="text-xs text-muted-foreground">#{m.currentRank}</p>}
+                          <div className="flex items-center gap-2 justify-end">
+                            <span className="text-[10px] font-mono text-emerald-400/70">+{m.balanceChangePct}%</span>
+                            {m.currentRank && <span className="text-[10px] text-muted-foreground">#{m.currentRank}</span>}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">{formatBalance(m.currentBalance)} ELA</p>
                         </div>
                       </div>
                     </Link>
@@ -133,7 +139,11 @@ export default function Movers() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-mono text-red-400">{formatBalanceChange(m.balanceChange)}</p>
-                          {m.currentRank && <p className="text-xs text-muted-foreground">#{m.currentRank}</p>}
+                          <div className="flex items-center gap-2 justify-end">
+                            <span className="text-[10px] font-mono text-red-400/70">{m.balanceChangePct}%</span>
+                            {m.currentRank && <span className="text-[10px] text-muted-foreground">#{m.currentRank}</span>}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">{formatBalance(m.currentBalance)} ELA</p>
                         </div>
                       </div>
                     </Link>

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { ArrowLeftRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown, UserPlus, UserMinus } from "lucide-react";
+import { Link } from "wouter";
 import { formatBalance, formatBalanceChange, truncateAddress, getCategoryColor } from "@/lib/utils";
 import { StatCard } from "@/components/stat-card";
 import {
@@ -132,7 +133,7 @@ export default function Compare() {
               title="Balance Change"
               value={formatBalanceChange(data.stats.totalBalanceChange)}
               icon={TrendingUp}
-              iconColor={data.stats.totalBalanceChange >= 0 ? "text-emerald-400" : "text-red-400"}
+              iconColor={data.stats.totalBalanceChange === 0 ? "text-muted-foreground" : data.stats.totalBalanceChange > 0 ? "text-emerald-400" : "text-red-400"}
             />
             <StatCard title="Moved Up" value={data.stats.movedUp} icon={ArrowUp} iconColor="text-emerald-400" />
             <StatCard title="Moved Down" value={data.stats.movedDown} icon={ArrowDown} iconColor="text-red-400" />
@@ -178,16 +179,18 @@ export default function Compare() {
                           {row.toRank ? <RankMedal rank={row.toRank} /> : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            {row.label && (
-                              <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${getCategoryColor(row.category)}`}>
-                                {row.label}
-                              </Badge>
-                            )}
-                            <span className="font-mono text-xs">{truncateAddress(row.address)}</span>
-                            {row.status === "new" && <Badge className="text-xs bg-emerald-500/20 text-emerald-400 no-default-hover-elevate no-default-active-elevate">NEW</Badge>}
-                            {row.status === "dropped" && <Badge className="text-xs bg-red-500/20 text-red-400 no-default-hover-elevate no-default-active-elevate">OUT</Badge>}
-                          </div>
+                          <Link href={`/address/${row.address}`}>
+                            <div className="flex items-center gap-2 cursor-pointer">
+                              {row.label && (
+                                <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${getCategoryColor(row.category)}`}>
+                                  {row.label}
+                                </Badge>
+                              )}
+                              <span className="font-mono text-xs hover:underline">{truncateAddress(row.address)}</span>
+                              {row.status === "new" && <Badge className="text-xs bg-emerald-500/20 text-emerald-400 no-default-hover-elevate no-default-active-elevate">NEW</Badge>}
+                              {row.status === "dropped" && <Badge className="text-xs bg-red-500/20 text-red-400 no-default-hover-elevate no-default-active-elevate">OUT</Badge>}
+                            </div>
+                          </Link>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs hidden sm:table-cell">
                           {row.fromBalance ? formatBalance(row.fromBalance) : "—"}

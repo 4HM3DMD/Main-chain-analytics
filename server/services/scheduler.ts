@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { fetchRichList } from "./fetcher";
+import { fetchEscRichList } from "./esc-fetcher";
 import { analyzeSnapshot, type AddressHistoryMap } from "./analyzer";
 import { buildConcentrationMetrics } from "./analytics";
 import { storage } from "../storage";
@@ -228,14 +229,66 @@ async function computeWeeklySummary(): Promise<void> {
   }
 }
 
+// ─── ESC Snapshot (completely isolated from mainchain) ────────────────────
+
+let escFailures = 0;
+let escSkipUntil: Date | null = null;
+
+async function takeEscSnapshot(): Promise<void> {
+  if (escSkipUntil && new Date() < escSkipUntil) return;
+
+  const date = getTodayDate();
+  const timeSlot = getCurrentTimeSlot();
+
+  try {
+    const existing = await storage.getSnapshotByDateSlotChain(date, timeSlot, "esc");
+    if (existing) return;
+
+    const fetchResult = await fetchEscRichList();
+
+    const prevSnapshot = await storage.getLatestSnapshotByChain("esc");
+    const prevEntries = prevSnapshot ? await storage.getEntriesBySnapshotId(prevSnapshot.id) : [];
+
+    let escSnapshot;
+    try {
+      escSnapshot = await storage.insertSnapshot({
+        chain: "esc", date, timeSlot,
+        fetchedAt: new Date().toISOString(),
+        totalBalances: fetchResult.totalSupply,
+        totalRichlist: fetchResult.richlist.length,
+      });
+    } catch (err: any) {
+      if (err.code === "23505") return;
+      throw err;
+    }
+
+    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, escSnapshot.id);
+    await storage.insertSnapshotEntries(analysis.entries);
+
+    log(`ESC snapshot ${escSnapshot.id}: ${analysis.entries.length} entries`, "scheduler");
+    escFailures = 0;
+    escSkipUntil = null;
+  } catch (error: any) {
+    escFailures++;
+    log(`ESC snapshot failed (#${escFailures}): ${error.message}`, "scheduler");
+    if (escFailures >= 3) {
+      const mins = Math.min(15 * Math.pow(2, Math.floor((escFailures - 3) / 3)), 120);
+      escSkipUntil = new Date(Date.now() + mins * 60000);
+    }
+  }
+}
+
 export function startScheduler(): void {
   // Mainchain snapshot every 5 minutes
   cron.schedule("*/5 * * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
 
+  // ESC snapshot every 5 minutes (offset by 2 minutes to avoid overlap)
+  cron.schedule("2-59/5 * * * *", () => takeEscSnapshot(), { timezone: "UTC" });
+
   // Weekly summary every Sunday at 23:59 UTC
   cron.schedule("59 23 * * 0", () => computeWeeklySummary(), { timezone: "UTC" });
 
-  log("Scheduler started: snapshots every 5 minutes UTC, weekly summary Sundays 23:59 UTC", "scheduler");
+  log("Scheduler started: mainchain + ESC every 5min, weekly summary Sundays", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {

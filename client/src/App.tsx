@@ -22,6 +22,8 @@ import HallOfFame from "@/pages/hall-of-fame";
 import Analytics from "@/pages/analytics";
 import GhostWallets from "@/pages/ghost-wallets";
 import Entities from "@/pages/entities";
+import EscDashboard from "@/pages/esc-dashboard";
+import EthOverview from "@/pages/eth-overview";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -31,6 +33,8 @@ function Router() {
       <Route path="/analytics" component={Analytics} />
       <Route path="/ghost-wallets" component={GhostWallets} />
       <Route path="/entities" component={Entities} />
+      <Route path="/esc" component={EscDashboard} />
+      <Route path="/ethereum" component={EthOverview} />
       <Route path="/flows" component={Flows} />
       <Route path="/history" component={History} />
       <Route path="/compare" component={Compare} />

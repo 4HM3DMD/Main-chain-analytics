@@ -27,6 +27,13 @@ const KNOWN_ADDRESSES = [
   { address: "8PwL7pYuDS9EHFa2ej6ZLoy95TxeZV8dzJ", label: "Potential EF Address", category: "ef", notes: "Strictly used for voting in Term 6 Elastos DAO elections, hence high probability of being an Elastos Foundation address." },
   { address: "EabAPwWynzzEn8uYyRXGwyvJ4V42CqWuev", label: "Potential EF Address", category: "ef", notes: "Flagged due to suspicious activity patterns consistent with Elastos Foundation operations." },
   { address: "EUv3qKaZUmtfhxdQyML7qk7VAko2shAnfV", label: "Potential EF Address", category: "ef", notes: "Flagged due to suspicious activity patterns consistent with Elastos Foundation operations." },
+  // ─── ESC (Elastos Smart Chain) Labels ───────────────────────────────────
+  // These are 0x addresses — never collide with mainchain addresses
+  { address: "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4", label: "ESC Top Holder #1", category: "whale", notes: "Largest native ELA holder on Elastos Smart Chain" },
+  { address: "0xC882b111A75C0c657fC507C04FbFcD2cC984F071", label: "Glide Finance", category: "exchange", notes: "Glide Finance DEX on ESC" },
+  { address: "0x517E9e5d46C1EA8aB6f78677d6114Ef47F71f6c4", label: "FilDA Protocol", category: "dao", notes: "FilDA lending protocol on ESC" },
+  // ─── Ethereum Labels ───────────────────────────────────────────────────
+  { address: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum, bridged via ShadowTokens from ESC" },
 ];
 
 // Addresses to remove (temporarily unlabeled)

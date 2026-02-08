@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { triggerManualSnapshot, startScheduler, initializeIfEmpty } from "./services/scheduler";
 import { backfillConcentrationMetrics, backfillEntryAnalytics } from "./services/backfill";
+import { fetchEthElaSupply, fetchEthRecentTransfers } from "./services/eth-fetcher";
 import { seedAddressLabels } from "./services/seed-labels";
 import { log } from "./index";
 
@@ -858,6 +859,46 @@ export async function registerRoutes(
       }
 
       res.json({ data, count: data.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ESC (Elastos Smart Chain) — Separate view, completely isolated
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  app.get("/api/esc/dashboard", async (_req, res) => {
+    try {
+      const snapshot = await storage.getLatestSnapshotByChain("esc");
+      if (!snapshot) return res.json({ snapshot: null, entries: [], stats: { totalSnapshots: 0 } });
+
+      const entries = await storage.getEntriesWithLabels(snapshot.id);
+      const totalBalance = entries.reduce((s, e) => s + e.balance, 0);
+
+      res.json({ snapshot, entries, totalBalance });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Ethereum — Separate view, supply + transfers
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  app.get("/api/eth/overview", async (_req, res) => {
+    try {
+      let supply = { totalSupply: 0, contractAddress: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867" };
+      try { supply = await fetchEthElaSupply(); } catch { /* non-critical */ }
+
+      let transfers: any[] = [];
+      try { transfers = await fetchEthRecentTransfers(20); } catch { /* non-critical */ }
+
+      res.json({
+        totalSupply: supply.totalSupply,
+        contractAddress: supply.contractAddress,
+        transfers,
+      });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

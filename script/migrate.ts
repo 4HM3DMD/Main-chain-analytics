@@ -20,9 +20,16 @@ async function migrate() {
     await pool.query(`ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS chain text NOT NULL DEFAULT 'mainchain'`);
     console.log("  snapshots.chain: OK");
 
-    // 2. Drop old unique constraint that doesn't include chain
+    // 2. Ensure unique constraint includes chain column (date, time_slot, chain)
+    //    Drop old constraint first, then re-add with chain so db:push has nothing to do
     await pool.query(`ALTER TABLE snapshots DROP CONSTRAINT IF EXISTS snapshots_date_time_slot`).catch(() => {});
-    console.log("  dropped old snapshots unique constraint: OK");
+    await pool.query(`
+      ALTER TABLE snapshots
+      ADD CONSTRAINT snapshots_date_time_slot UNIQUE (date, time_slot, chain)
+    `).catch(() => {
+      // Already exists with correct definition — safe to ignore
+    });
+    console.log("  snapshots unique constraint (date, time_slot, chain): OK");
 
     // 3. Add chain column to concentration_metrics if not exists
     await pool.query(`ALTER TABLE concentration_metrics ADD COLUMN IF NOT EXISTS chain text NOT NULL DEFAULT 'mainchain'`);

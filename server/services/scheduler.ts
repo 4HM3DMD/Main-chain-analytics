@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { fetchRichList } from "./fetcher";
 import { fetchEscRichList } from "./esc-fetcher";
+import { fetchEthElaHolders } from "./eth-holder-fetcher";
 import { analyzeSnapshot, type AddressHistoryMap } from "./analyzer";
 import { buildConcentrationMetrics } from "./analytics";
 import { storage } from "../storage";
@@ -298,6 +299,78 @@ async function takeEscSnapshot(): Promise<void> {
   }
 }
 
+// ─── Ethereum Snapshot (ELA ERC-20 holders via Moralis) ───────────────────
+
+let ethFailures = 0;
+let ethSkipUntil: Date | null = null;
+
+async function takeEthSnapshot(): Promise<void> {
+  // Skip if no MORALIS_API_KEY configured
+  if (!process.env.MORALIS_API_KEY) return;
+
+  if (ethSkipUntil && new Date() < ethSkipUntil) return;
+
+  const date = getTodayDate();
+  const timeSlot = getCurrentTimeSlot();
+
+  try {
+    const existing = await storage.getSnapshotByDateSlotChain(date, timeSlot, "ethereum");
+    if (existing) return;
+
+    const fetchResult = await fetchEthElaHolders();
+
+    const prevSnapshot = await storage.getLatestSnapshotByChain("ethereum");
+    const prevEntries = prevSnapshot ? await storage.getEntriesBySnapshotId(prevSnapshot.id) : [];
+
+    let ethSnapshot;
+    try {
+      ethSnapshot = await storage.insertSnapshot({
+        chain: "ethereum", date, timeSlot,
+        fetchedAt: new Date().toISOString(),
+        totalBalances: fetchResult.totalSupply,
+        totalRichlist: fetchResult.richlist.length,
+      });
+    } catch (err: any) {
+      if (err.code === "23505") return;
+      throw err;
+    }
+
+    // Build address history for Ethereum analytics
+    let ethAddressHistory: AddressHistoryMap | undefined;
+    try {
+      const addrs = fetchResult.richlist.map(r => r.address);
+      ethAddressHistory = {};
+      for (const addr of addrs) {
+        try {
+          const entries = await storage.getRecentAddressEntries(addr, 30);
+          if (entries.length > 0) ethAddressHistory[addr] = entries;
+        } catch { /* skip */ }
+      }
+    } catch { /* non-critical */ }
+
+    const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, ethSnapshot.id, ethAddressHistory);
+    await storage.insertSnapshotEntries(analysis.entries);
+
+    // Compute concentration metrics for Ethereum
+    try {
+      const storedEntries = await storage.getEntriesBySnapshotId(ethSnapshot.id);
+      const metrics = buildConcentrationMetrics(ethSnapshot.id, date, timeSlot, storedEntries, analysis.newEntries.length, analysis.dropouts.length);
+      await storage.insertConcentrationMetrics({ ...metrics, chain: "ethereum" });
+    } catch { /* non-critical */ }
+
+    log(`ETH snapshot ${ethSnapshot.id}: ${analysis.entries.length} ELA holders`, "scheduler");
+    ethFailures = 0;
+    ethSkipUntil = null;
+  } catch (error: any) {
+    ethFailures++;
+    log(`ETH snapshot failed (#${ethFailures}): ${error.message}`, "scheduler");
+    if (ethFailures >= 3) {
+      const mins = Math.min(15 * Math.pow(2, Math.floor((ethFailures - 3) / 3)), 120);
+      ethSkipUntil = new Date(Date.now() + mins * 60000);
+    }
+  }
+}
+
 export function startScheduler(): void {
   // Mainchain snapshot every 5 minutes
   cron.schedule("*/5 * * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
@@ -305,10 +378,13 @@ export function startScheduler(): void {
   // ESC snapshot every 5 minutes (offset by 2 minutes to avoid overlap)
   cron.schedule("2-59/5 * * * *", () => takeEscSnapshot(), { timezone: "UTC" });
 
+  // Ethereum snapshot every 5 minutes (offset by 4 minutes to avoid overlap)
+  cron.schedule("4-59/5 * * * *", () => takeEthSnapshot(), { timezone: "UTC" });
+
   // Weekly summary every Sunday at 23:59 UTC
   cron.schedule("59 23 * * 0", () => computeWeeklySummary(), { timezone: "UTC" });
 
-  log("Scheduler started: mainchain + ESC every 5min, weekly summary Sundays", "scheduler");
+  log("Scheduler started: mainchain + ESC + ETH every 5min, weekly summary Sundays", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {

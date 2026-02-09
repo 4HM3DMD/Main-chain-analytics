@@ -40,8 +40,8 @@ export const CHAINS: Record<Chain, ChainInfo> = {
     shortName: "ETH",
     explorerUrl: "https://etherscan.io/address",
     color: "text-amber-400",
-    hasSnapshots: false,
-    topN: 100,
+    hasSnapshots: true,
+    topN: 50,
   },
 };
 

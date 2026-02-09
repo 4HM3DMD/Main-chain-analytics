@@ -56,11 +56,28 @@ export async function registerRoutes(
 
       const summaries = await storage.getRecentSummaries(5);
 
-      // Fetch latest analytics metrics
+      // Fetch latest analytics metrics with 24h trends
       let analytics = null;
       try {
         const latestMetrics = await storage.getLatestConcentrationMetrics(chain);
         if (latestMetrics) {
+          // Fetch last 30 metrics for 24h comparison (288 snapshots/day, need ~30 for safety)
+          const history = await storage.getConcentrationHistory(30, chain);
+          
+          // Find metric from ~24h ago
+          const h24 = history.find(h => {
+            const diff = new Date(latestMetrics.date).getTime() - new Date(h.date).getTime();
+            return diff >= 82800000; // ~23 hours (allows for some variance)
+          });
+
+          // Sum last 24h net flow (all metrics where date diff < 24h)
+          const netFlow24h = history
+            .filter(h => {
+              const diff = new Date(latestMetrics.date).getTime() - new Date(h.date).getTime();
+              return diff >= 0 && diff < 86400000;
+            })
+            .reduce((s, h) => s + (h.netFlow || 0), 0);
+
           analytics = {
             giniCoefficient: latestMetrics.giniCoefficient,
             hhi: latestMetrics.hhi,
@@ -69,6 +86,11 @@ export async function registerRoutes(
             activeWallets: latestMetrics.activeWallets,
             top10Pct: latestMetrics.top10Pct,
             top20Pct: latestMetrics.top20Pct,
+            // 24h trends
+            gini24hChange: h24 ? (latestMetrics.giniCoefficient || 0) - (h24.giniCoefficient || 0) : null,
+            wai24hChange: h24 ? (latestMetrics.whaleActivityIndex || 0) - (h24.whaleActivityIndex || 0) : null,
+            netFlow24h: netFlow24h !== 0 ? netFlow24h : null,
+            top10Pct24hChange: h24 ? (latestMetrics.top10Pct || 0) - (h24.top10Pct || 0) : null,
           };
         }
       } catch {
@@ -885,6 +907,110 @@ export async function registerRoutes(
       }
 
       res.json({ data, count: data.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Cross-Chain Intelligence Summary
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * GET /api/cross-chain/summary
+   * Unified view across all 3 chains: Main, ESC, Ethereum.
+   * Shows supply flow, category breakdown, and who's accumulating/distributing.
+   */
+  app.get("/api/cross-chain/summary", async (_req, res) => {
+    try {
+      const chains = ["mainchain", "esc", "ethereum"] as const;
+      
+      // Fetch latest snapshot + metrics from each chain
+      const chainData = await Promise.all(
+        chains.map(async (chain) => {
+          const snapshot = await storage.getLatestSnapshot(chain);
+          if (!snapshot) return { chain, snapshot: null, entries: [], metrics: null };
+
+          const entries = await storage.getEntriesWithLabels(snapshot.id);
+          const metrics = await storage.getLatestConcentrationMetrics(chain);
+
+          return { chain, snapshot, entries, metrics };
+        })
+      );
+
+      // Compute category breakdown per chain
+      const categoryBreakdown: Record<string, { mainchain: number; esc: number; ethereum: number; total: number }> = {};
+      
+      for (const cd of chainData) {
+        for (const entry of cd.entries) {
+          const cat = entry.category || "unknown";
+          if (!categoryBreakdown[cat]) {
+            categoryBreakdown[cat] = { mainchain: 0, esc: 0, ethereum: 0, total: 0 };
+          }
+          categoryBreakdown[cat][cd.chain] += entry.balance;
+          categoryBreakdown[cat].total += entry.balance;
+        }
+      }
+
+      // Supply flow (Main → ESC → ETH)
+      const mainBalance = chainData[0].entries.reduce((s, e) => s + e.balance, 0);
+      const escBalance = chainData[1].entries.reduce((s, e) => s + e.balance, 0);
+      const ethBalance = chainData[2].entries.reduce((s, e) => s + e.balance, 0);
+      
+      // ESC bridge address on mainchain
+      const escBridgeEntry = chainData[0].entries.find(e => e.address === "XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf");
+      const escBridgeBalance = escBridgeEntry?.balance || 0;
+
+      // ShadowTokens bridge on ESC
+      const shadowBridgeEntry = chainData[1].entries.find(e => e.address === "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4");
+      const shadowBridgeBalance = shadowBridgeEntry?.balance || 0;
+
+      // Top accumulators/distributors across all chains (from latest snapshots)
+      const allMovers: Array<{chain: string; address: string; label: string | null; balanceChange: number; category: string | null}> = [];
+      
+      for (const cd of chainData) {
+        const movers = cd.entries
+          .filter(e => e.balanceChange !== null && e.balanceChange !== 0)
+          .map(e => ({
+            chain: cd.chain,
+            address: e.address,
+            label: e.label,
+            balanceChange: e.balanceChange!,
+            category: e.category,
+          }));
+        allMovers.push(...movers);
+      }
+
+      // Sort by absolute change
+      allMovers.sort((a, b) => Math.abs(b.balanceChange) - Math.abs(a.balanceChange));
+      const topAccumulators = allMovers.filter(m => m.balanceChange > 0).slice(0, 5);
+      const topDistributors = allMovers.filter(m => m.balanceChange < 0).slice(0, 5);
+
+      // Chain health metrics
+      const chainHealth = chainData.map(cd => ({
+        chain: cd.chain,
+        gini: cd.metrics?.giniCoefficient ?? null,
+        wai: cd.metrics?.whaleActivityIndex ?? null,
+        activeWallets: cd.metrics?.activeWallets ?? null,
+        netFlow24h: cd.metrics?.netFlow ?? null, // This is actually per-snapshot, not 24h
+        totalBalance: cd.entries.reduce((s, e) => s + e.balance, 0),
+      }));
+
+      res.json({
+        supplyFlow: {
+          mainchainTopN: mainBalance,
+          escBridgeOnMain: escBridgeBalance,
+          escTopN: escBalance,
+          shadowBridgeOnEsc: shadowBridgeBalance,
+          ethTopN: ethBalance,
+        },
+        categoryBreakdown: Object.entries(categoryBreakdown)
+          .map(([category, balances]) => ({ category, ...balances }))
+          .sort((a, b) => b.total - a.total),
+        topAccumulators,
+        topDistributors,
+        chainHealth,
+      });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

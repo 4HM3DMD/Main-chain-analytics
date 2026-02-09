@@ -52,6 +52,10 @@ interface DashboardData {
     activeWallets: number | null;
     top10Pct: number | null;
     top20Pct: number | null;
+    gini24hChange: number | null;
+    wai24hChange: number | null;
+    netFlow24h: number | null;
+    top10Pct24hChange: number | null;
   } | null;
   summaries: Array<{
     date: string;
@@ -76,11 +80,11 @@ const CATEGORY_FILTERS = [
 ];
 
 const COMPARE_PERIODS = [
+  { key: "24h", label: "24h" },
+  { key: "7d", label: "7d" },
+  { key: "30d", label: "30d" },
+  { key: "1h", label: "1h" },
   { key: "5m", label: "Last Snapshot" },
-  { key: "1h", label: "1 Hour" },
-  { key: "24h", label: "24 Hours" },
-  { key: "7d", label: "7 Days" },
-  { key: "30d", label: "30 Days" },
 ];
 
 interface ChangesData {
@@ -93,7 +97,7 @@ interface ChangesData {
 export default function Dashboard() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"rank" | "change" | "supply">("rank");
-  const [comparePeriod, setComparePeriod] = useState("5m");
+  const [comparePeriod, setComparePeriod] = useState("24h");
   const { chain, chainInfo } = useChain();
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
   const topN = chainInfo.topN;
@@ -106,7 +110,6 @@ export default function Dashboard() {
   const { data: changesData } = useQuery<ChangesData>({
     queryKey: ["/api/dashboard/changes", `?period=${comparePeriod}${chainSuffix ? `&${chainSuffix}` : ""}`],
     refetchInterval: 300000,
-    enabled: comparePeriod !== "5m", // Only fetch when not using default
   });
 
   if (error) {
@@ -151,6 +154,9 @@ export default function Dashboard() {
   const totalBalance = dashboard.entries.reduce((s, e) => s + e.balance, 0);
   const top10Balance = dashboard.entries.slice(0, 10).reduce((s, e) => s + e.balance, 0);
   const top10Pct = totalBalance > 0 ? ((top10Balance / totalBalance) * 100).toFixed(1) : "0";
+  
+  // Exchange balance (sum of all exchange category entries)
+  const exchangeBalance = dashboard.entries.filter(e => e.category === "exchange").reduce((s, e) => s + e.balance, 0);
 
   const significantMovers = dashboard.entries.filter(
     (e) => e.balanceChange !== null && Math.abs(e.balanceChange) > 1000
@@ -178,11 +184,9 @@ export default function Dashboard() {
     });
 
   // Change context label
-  const changeContext = comparePeriod === "5m"
-    ? "vs previous snapshot"
-    : changesData?.compareSnapshot
-      ? `vs ${changesData.compareSnapshot.label}`
-      : `vs ${comparePeriod} ago`;
+  const changeContext = changesData?.compareSnapshot
+    ? `vs ${changesData.compareSnapshot.label}`
+    : `vs ${comparePeriod} ago`;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
@@ -190,72 +194,84 @@ export default function Dashboard() {
         <StatCard
           title={`Top ${topN} Balance`}
           value={`${(totalBalance / 1000000).toFixed(2)}M`}
-          subtitle={`${formatSupplyPct(totalBalance)} of total supply`}
+          subtitle={`${formatSupplyPct(totalBalance)} of supply`}
+          trend={dashboard.analytics?.netFlow24h ? (dashboard.analytics.netFlow24h > 0 ? "up" : "down") : undefined}
+          trendLabel={dashboard.analytics?.netFlow24h ? `${formatCompact(dashboard.analytics.netFlow24h)} in 24h` : undefined}
           icon={Wallet}
           iconColor="text-blue-400"
         />
         <StatCard
-          title="Top 10 Share"
-          value={`${top10Pct}%`}
-          subtitle={`${formatBalance(top10Balance)} ELA`}
-          icon={TrendingUp}
-          iconColor="text-emerald-400"
-        />
-        <StatCard
-          title="Total Snapshots"
-          value={dashboard.stats.totalSnapshots}
-          icon={Clock}
+          title="Exchange Holdings"
+          value={`${(exchangeBalance / 1000000).toFixed(2)}M`}
+          subtitle={`${((exchangeBalance / totalBalance) * 100).toFixed(1)}% of top ${topN}`}
+          icon={ArrowUpDown}
           iconColor="text-purple-400"
         />
         <StatCard
-          title="Unique Addresses"
-          value={dashboard.stats.uniqueAddresses}
-          icon={Users}
-          iconColor="text-orange-400"
+          title="24h Net Flow"
+          value={dashboard.analytics?.netFlow24h ? formatCompact(dashboard.analytics.netFlow24h) : "—"}
+          subtitle={dashboard.analytics?.netFlow24h ? (dashboard.analytics.netFlow24h > 0 ? "Accumulating" : "Distributing") : "Waiting for data"}
+          icon={TrendingUp}
+          iconColor={dashboard.analytics?.netFlow24h && dashboard.analytics.netFlow24h > 0 ? "text-emerald-400" : "text-red-400"}
         />
         <StatCard
-          title="Last Updated"
-          value={dashboard.snapshot ? timeAgo(dashboard.snapshot.fetchedAt) : "—"}
-          subtitle={dashboard.snapshot ? `${dashboard.snapshot.date} ${dashboard.snapshot.timeSlot}` : undefined}
-          icon={RefreshCw}
+          title="Active Wallets"
+          value={dashboard.analytics?.activeWallets ?? "—"}
+          subtitle={`of ${topN} moved in last snapshot`}
+          icon={Zap}
           iconColor="text-amber-400"
+        />
+        <StatCard
+          title="Top 10 Dominance"
+          value={`${top10Pct}%`}
+          subtitle={`${formatBalance(top10Balance)} ELA`}
+          trend={dashboard.analytics?.top10Pct24hChange ? (dashboard.analytics.top10Pct24hChange > 0 ? "up" : "down") : undefined}
+          trendLabel={dashboard.analytics?.top10Pct24hChange ? `${dashboard.analytics.top10Pct24hChange > 0 ? "+" : ""}${dashboard.analytics.top10Pct24hChange.toFixed(2)}% (24h)` : undefined}
+          icon={TrendingUp}
+          iconColor="text-emerald-400"
         />
       </div>
 
-      {/* Analytics Indicators */}
+      {/* Analytics Pulse — 24h trends */}
       {dashboard.analytics && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Wealth Spread — plain-English replacement for Gini */}
+          {/* Concentration Trend */}
           <Card>
             <CardContent className="p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Gauge className="w-4 h-4 text-blue-400" />
-                <p className="text-xs text-muted-foreground">Wealth Spread</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-blue-400" />
+                  <p className="text-xs text-muted-foreground">Wealth Concentration</p>
+                </div>
+                {dashboard.analytics.gini24hChange !== null && dashboard.analytics.gini24hChange !== 0 && (
+                  <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                    {dashboard.analytics.gini24hChange > 0 ? "↑" : "↓"} {Math.abs(dashboard.analytics.gini24hChange * 100).toFixed(1)}%
+                  </Badge>
+                )}
               </div>
               <p className="text-sm font-semibold">{getWealthSpreadLevel(dashboard.analytics.giniCoefficient)}</p>
-              <div className="mt-2">
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${getWealthSpreadPct(dashboard.analytics.giniCoefficient)}%`,
-                      background: `linear-gradient(90deg, #22c55e, #eab308 50%, #ef4444)`,
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                  <span>Spread Out</span>
-                  <span>Concentrated</span>
-                </div>
-              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {dashboard.analytics.gini24hChange && dashboard.analytics.gini24hChange > 0 
+                  ? "Getting more concentrated"
+                  : dashboard.analytics.gini24hChange && dashboard.analytics.gini24hChange < 0
+                  ? "Spreading out" 
+                  : "Stable"}
+              </p>
             </CardContent>
           </Card>
-          {/* Whale Activity */}
+          {/* Whale Activity Trend */}
           <Card>
             <CardContent className="p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-4 h-4 text-amber-400" />
-                <p className="text-xs text-muted-foreground">Whale Activity</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <p className="text-xs text-muted-foreground">Whale Activity</p>
+                </div>
+                {dashboard.analytics.wai24hChange !== null && dashboard.analytics.wai24hChange !== 0 && (
+                  <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                    {dashboard.analytics.wai24hChange > 0 ? "↑" : "↓"} {Math.abs(dashboard.analytics.wai24hChange).toFixed(1)}
+                  </Badge>
+                )}
               </div>
               <p className={`text-lg font-bold font-mono ${getWAIColor(dashboard.analytics.whaleActivityIndex)}`}>
                 {formatWAI(dashboard.analytics.whaleActivityIndex)}
@@ -263,19 +279,20 @@ export default function Dashboard() {
               <p className="text-[10px] text-muted-foreground">{getWAILevel(dashboard.analytics.whaleActivityIndex)}</p>
             </CardContent>
           </Card>
-          {/* Net Flow */}
+          {/* Churn Rate */}
           <Card>
             <CardContent className="p-3">
               <div className="flex items-center gap-2 mb-2">
-                <ArrowUpDown className="w-4 h-4 text-emerald-400" />
-                <p className="text-xs text-muted-foreground">Net Flow</p>
+                <Users className="w-4 h-4 text-orange-400" />
+                <p className="text-xs text-muted-foreground">Roster Churn</p>
               </div>
-              <p className={`text-lg font-bold font-mono ${getChangeColor(dashboard.analytics.netFlow)}`}>
-                {dashboard.analytics.netFlow !== null ? formatCompact(dashboard.analytics.netFlow) : "—"}
+              <p className="text-lg font-bold font-mono">
+                {newEntries.length + dropouts.length}
               </p>
-              <p className="text-[10px] text-muted-foreground">
-                Top {topN} hold {formatSupplyPct(totalBalance)} of total supply
-              </p>
+              <div className="flex gap-2 text-[10px] text-muted-foreground mt-1">
+                <span className="text-emerald-400">{newEntries.length} in</span>
+                <span className="text-red-400">{dropouts.length} out</span>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -95,9 +95,12 @@ export default function Compare() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button variant="secondary" size="sm" onClick={() => setQuick(1)} data-testid="button-quick-1d">Yesterday vs Today</Button>
-            <Button variant="secondary" size="sm" onClick={() => setQuick(7)} data-testid="button-quick-7d">Last Week</Button>
-            <Button variant="secondary" size="sm" onClick={() => setQuick(30)} data-testid="button-quick-30d">Last Month</Button>
+            <Button variant="secondary" size="sm" onClick={() => setQuick(1)} data-testid="button-quick-1d">24h</Button>
+            <Button variant="secondary" size="sm" onClick={() => setQuick(3)} data-testid="button-quick-3d">3d</Button>
+            <Button variant="secondary" size="sm" onClick={() => setQuick(7)} data-testid="button-quick-7d">7d</Button>
+            <Button variant="secondary" size="sm" onClick={() => setQuick(14)} data-testid="button-quick-14d">14d</Button>
+            <Button variant="secondary" size="sm" onClick={() => setQuick(30)} data-testid="button-quick-30d">30d</Button>
+            <Button variant="secondary" size="sm" onClick={() => setQuick(90)} data-testid="button-quick-90d">90d</Button>
           </div>
         </CardContent>
       </Card>

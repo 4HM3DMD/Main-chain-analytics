@@ -23,6 +23,7 @@ const KNOWN_ADDRESSES = [
   { address: "EHpQRE4K4e2UhD55ingFc7TETuve13aWbZ", label: "KuCoin Exchange", category: "exchange" },
   { address: "EKk4HeHnLvMpxFiSbjVizcrCB1nVt39Bwe", label: "Gate.io Exchange", category: "exchange" },
   { address: "ETsfuQEcNJbmeT5iPXJxJLc7CtipgaEWZQ", label: "CoinEX Exchange", category: "exchange" },
+  { address: "EfpBYgTZxsrS3qtAApMTuSwW1M2N5ieH7k", label: "MEXC Exchange", category: "exchange" },
   // Elastos Foundation (potential)
   { address: "8PwL7pYuDS9EHFa2ej6ZLoy95TxeZV8dzJ", label: "Potential EF Address", category: "ef", notes: "Strictly used for voting in Term 6 Elastos DAO elections, hence high probability of being an Elastos Foundation address." },
   { address: "EabAPwWynzzEn8uYyRXGwyvJ4V42CqWuev", label: "Potential EF Address", category: "ef", notes: "Flagged due to suspicious activity patterns consistent with Elastos Foundation operations." },

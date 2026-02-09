@@ -384,20 +384,42 @@ async function takeEthSnapshot(): Promise<void> {
   }
 }
 
+/**
+ * Take snapshots for all 3 chains simultaneously (same timeSlot).
+ * Runs chains sequentially to avoid API rate limit issues.
+ * Each chain has independent error handling — one failing doesn't block others.
+ */
+async function takeAllSnapshots(): Promise<void> {
+  const date = getTodayDate();
+  const timeSlot = getCurrentTimeSlot();
+  log(`Starting synchronized snapshot for all chains: ${date} ${timeSlot}`, "scheduler");
+
+  // Main Chain
+  await takeSnapshot("cron").catch((err) => {
+    log(`Main chain snapshot failed: ${err.message}`, "scheduler");
+  });
+
+  // ESC
+  await takeEscSnapshot().catch((err) => {
+    log(`ESC snapshot failed: ${err.message}`, "scheduler");
+  });
+
+  // Ethereum
+  await takeEthSnapshot().catch((err) => {
+    log(`ETH snapshot failed: ${err.message}`, "scheduler");
+  });
+
+  log(`Synchronized snapshot complete: ${date} ${timeSlot}`, "scheduler");
+}
+
 export function startScheduler(): void {
-  // Mainchain snapshot every 5 minutes
-  cron.schedule("*/5 * * * *", () => takeSnapshot("cron"), { timezone: "UTC" });
-
-  // ESC snapshot every 5 minutes (offset by 2 minutes to avoid overlap)
-  cron.schedule("2-59/5 * * * *", () => takeEscSnapshot(), { timezone: "UTC" });
-
-  // Ethereum snapshot every 5 minutes (offset by 4 minutes to avoid overlap)
-  cron.schedule("4-59/5 * * * *", () => takeEthSnapshot(), { timezone: "UTC" });
+  // All chains snapshot together every 5 minutes (synchronized timeSlot)
+  cron.schedule("*/5 * * * *", () => takeAllSnapshots(), { timezone: "UTC" });
 
   // Weekly summary every Sunday at 23:59 UTC
   cron.schedule("59 23 * * 0", () => computeWeeklySummary(), { timezone: "UTC" });
 
-  log("Scheduler started: mainchain + ESC + ETH every 5min, weekly summary Sundays", "scheduler");
+  log("Scheduler started: all 3 chains synchronized every 5min, weekly summary Sundays", "scheduler");
 }
 
 export async function initializeIfEmpty(): Promise<void> {

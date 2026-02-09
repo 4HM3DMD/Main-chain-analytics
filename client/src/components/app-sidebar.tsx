@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity, BarChart3, Ghost, Building2 } from "lucide-react";
+import { LayoutDashboard, Calendar, ArrowLeftRight, TrendingUp, Trophy, Activity, BarChart3, Ghost, Building2, Layers } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -61,6 +61,22 @@ export function AppSidebar() {
             <div className="px-2">
               <ChainSwitcher />
             </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Cross-Chain Overview */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/cross-chain"}>
+                  <Link href="/cross-chain">
+                    <Layers className="w-4 h-4" />
+                    <span>Cross-Chain</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 

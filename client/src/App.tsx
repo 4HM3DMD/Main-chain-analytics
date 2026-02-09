@@ -22,6 +22,7 @@ import HallOfFame from "@/pages/hall-of-fame";
 import Analytics from "@/pages/analytics";
 import GhostWallets from "@/pages/ghost-wallets";
 import Entities from "@/pages/entities";
+import CrossChain from "@/pages/cross-chain";
 import NotFound from "@/pages/not-found";
 
 function RedirectToMainchain() {
@@ -48,6 +49,9 @@ function Routes() {
     <Switch>
       <Route path="/">
         <RedirectToMainchain />
+      </Route>
+      <Route path="/cross-chain">
+        <CrossChain />
       </Route>
       <Route path="/:chain/address/:address">
         {(params) => (

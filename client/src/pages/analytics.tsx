@@ -177,6 +177,29 @@ export default function Analytics() {
   const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
+  // Check if analytics is supported for this chain
+  if (!chainInfo.hasSnapshots) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="text-center max-w-md space-y-4">
+          <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto" />
+          <h2 className="text-lg font-semibold">
+            Analytics Not Available for {chainInfo.name}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {chainInfo.name} does not have richlist snapshots, so analytics features are not available.
+            Visit the dashboard to see supply and transfer data.
+          </p>
+          <Link href={`/${chain}`}>
+            <Button variant="outline">
+              View {chainInfo.shortName} Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewData>({
     queryKey: ["/api/analytics/overview", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     refetchInterval: 300000,

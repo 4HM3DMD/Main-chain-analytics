@@ -16,21 +16,30 @@ import { ChainSwitcher } from "@/components/chain-switcher";
 import { useChain } from "@/lib/chain-context";
 
 const navItems = [
-  { title: "Dashboard", path: "", icon: LayoutDashboard },
-  { title: "Analytics", path: "analytics", icon: BarChart3 },
-  { title: "Shadow Entries", path: "ghost-wallets", icon: Ghost },
-  { title: "Entities", path: "entities", icon: Building2 },
-  { title: "Flows", path: "flows", icon: Activity },
-  { title: "History", path: "history", icon: Calendar },
-  { title: "Compare", path: "compare", icon: ArrowLeftRight },
-  { title: "Movers", path: "movers", icon: TrendingUp },
-  { title: "Hall of Fame", path: "hall-of-fame", icon: Trophy },
+  { title: "Dashboard", path: "", icon: LayoutDashboard, requiresSnapshots: false },
+  { title: "Analytics", path: "analytics", icon: BarChart3, requiresSnapshots: true },
+  { title: "Shadow Entries", path: "ghost-wallets", icon: Ghost, requiresSnapshots: true },
+  { title: "Entities", path: "entities", icon: Building2, requiresSnapshots: false },
+  { title: "Flows", path: "flows", icon: Activity, requiresSnapshots: true },
+  { title: "History", path: "history", icon: Calendar, requiresSnapshots: true },
+  { title: "Compare", path: "compare", icon: ArrowLeftRight, requiresSnapshots: true },
+  { title: "Movers", path: "movers", icon: TrendingUp, requiresSnapshots: true },
+  { title: "Hall of Fame", path: "hall-of-fame", icon: Trophy, requiresSnapshots: true },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { chain, chainInfo } = useChain();
   const base = `/${chain}`;
+
+  // Filter navigation items based on chain capabilities
+  const visibleNavItems = navItems.filter(item => {
+    // If item doesn't require snapshots, always show it
+    if (!item.requiresSnapshots) return true;
+    
+    // Otherwise, only show if chain has snapshots
+    return chainInfo.hasSnapshots;
+  });
 
   return (
     <Sidebar>
@@ -60,9 +69,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const href = item.path ? `${base}/${item.path}` : base;
-                const isActive = location === href || (item.path && location.startsWith(`${base}/${item.path}`));
+                const isActive = location === href || (!!item.path && location.startsWith(`${base}/${item.path}`));
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>

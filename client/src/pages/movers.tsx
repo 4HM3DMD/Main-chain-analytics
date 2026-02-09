@@ -30,8 +30,31 @@ interface MoversData {
 
 export default function Movers() {
   const [period, setPeriod] = useState("7d");
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+
+  // Check if movers tracking is supported for this chain
+  if (!chainInfo.hasSnapshots) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="text-center max-w-md space-y-4">
+          <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto" />
+          <h2 className="text-lg font-semibold">
+            Movers Not Available for {chainInfo.name}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {chainInfo.name} does not have richlist snapshots, so mover tracking is not available.
+            Visit the dashboard to see supply and transfer data.
+          </p>
+          <Link href={`/${chain}`}>
+            <Button variant="outline">
+              View {chainInfo.shortName} Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const { data, isLoading } = useQuery<MoversData>({
     queryKey: ["/api/movers", `?period=${period}${chainSuffix ? `&${chainSuffix}` : ""}`],

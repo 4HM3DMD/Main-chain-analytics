@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
-import { Users, Activity, Search, UserMinus, ArrowDown } from "lucide-react";
+import { Users, Activity, Search, UserMinus, ArrowDown, Trophy } from "lucide-react";
 import { formatBalance, getCategoryColor } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -55,8 +55,31 @@ export default function HallOfFame() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "dropped">("all");
   const [sortBy, setSortBy] = useState<"appearances" | "bestRank" | "lastBalance" | "firstSeen">("appearances");
-  const { chain } = useChain();
+  const { chain, chainInfo } = useChain();
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+
+  // Check if hall of fame is supported for this chain
+  if (!chainInfo.hasSnapshots) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="text-center max-w-md space-y-4">
+          <Trophy className="w-12 h-12 text-muted-foreground mx-auto" />
+          <h2 className="text-lg font-semibold">
+            Hall of Fame Not Available for {chainInfo.name}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {chainInfo.name} does not have richlist snapshots, so the hall of fame is not available.
+            Visit the dashboard to see supply and transfer data.
+          </p>
+          <Link href={`/${chain}`}>
+            <Button variant="outline">
+              View {chainInfo.shortName} Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const { data, isLoading } = useQuery<HallData>({
     queryKey: ["/api/hall-of-fame", ...(chainSuffix ? [`?${chainSuffix}`] : [])],

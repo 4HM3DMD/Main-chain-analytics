@@ -57,7 +57,7 @@ export async function fetchEscRichList(): Promise<EscFetchResult> {
 
       // Convert Wei to ELA and compute total
       let totalSupply = 0;
-      const richlist: EscRichListItem[] = items.map((item) => {
+      const richlist: EscRichListItem[] = items.map((item: any) => {
         const balanceWei = BigInt(item.coin_balance || "0");
         const balanceEla = Number(balanceWei) / 1e18;
         totalSupply += balanceEla;

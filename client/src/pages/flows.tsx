@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useChain } from "@/lib/chain-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, PieChart as PieChartIcon, TrendingUp, TrendingDown, AlertTriangle, Layers } from "lucide-react";
 import { formatBalance, formatBalanceChange, truncateAddress, getCategoryColor, getChangeColor } from "@/lib/utils";
@@ -81,6 +82,29 @@ export default function Flows() {
   const { chain, chainInfo } = useChain();
   const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
+
+  // Check if flows analysis is supported for this chain
+  if (!chainInfo.hasSnapshots) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="text-center max-w-md space-y-4">
+          <Activity className="w-12 h-12 text-muted-foreground mx-auto" />
+          <h2 className="text-lg font-semibold">
+            Flow Analysis Not Available for {chainInfo.name}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {chainInfo.name} does not have richlist snapshots, so flow tracking is not available.
+            Visit the dashboard to see supply and transfer data.
+          </p>
+          <Link href={`/${chain}`}>
+            <Button variant="outline">
+              View {chainInfo.shortName} Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const { data, isLoading } = useQuery<FlowsData>({
     queryKey: ["/api/flows", ...(chainSuffix ? [`?${chainSuffix}`] : [])],

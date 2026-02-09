@@ -22,6 +22,7 @@ import HallOfFame from "@/pages/hall-of-fame";
 import Analytics from "@/pages/analytics";
 import GhostWallets from "@/pages/ghost-wallets";
 import Entities from "@/pages/entities";
+import EthOverview from "@/pages/eth-overview";
 import NotFound from "@/pages/not-found";
 
 function RedirectToMainchain() {
@@ -41,6 +42,18 @@ function ChainGuard({
 }) {
   if (!isValidChain(chain)) return <NotFound />;
   return <>{children}</>;
+}
+
+function ChainAwareDashboard() {
+  const { chain } = useChain();
+  
+  // Ethereum uses its own overview component
+  if (chain === "ethereum") {
+    return <EthOverview />;
+  }
+  
+  // Main Chain and ESC both use the unified Dashboard
+  return <Dashboard />;
 }
 
 function Routes() {
@@ -115,7 +128,7 @@ function Routes() {
       <Route path="/:chain">
         {(params) => (
           <ChainGuard chain={params?.chain}>
-            <Dashboard />
+            <ChainAwareDashboard />
           </ChainGuard>
         )}
       </Route>

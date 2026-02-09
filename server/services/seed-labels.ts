@@ -31,8 +31,9 @@ const KNOWN_ADDRESSES = [
   // These are 0x addresses — never collide with mainchain addresses
   // All ELA on ESC originates from mainchain's XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf (ESC Sidechain Transfer)
   { address: "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4", label: "ShadowTokens Bridge (ETH Proxy)", category: "sidechain", notes: "ShadowTokens bridge contract — all ELA bridged to Ethereum goes through this address. Source of all ELA ERC-20 on Ethereum." },
-  { address: "0xC882b111A75C0c657fC507C04FbFcD2cC984F071", label: "Glide Finance", category: "exchange", notes: "Glide Finance DEX on ESC" },
-  { address: "0x517E9e5d46C1EA8aB6f78677d6114Ef47F71f6c4", label: "FilDA Protocol", category: "dao", notes: "FilDA lending protocol on ESC" },
+  { address: "0xC882b111A75C0c657fC507C04FbFcD2cC984F071", label: "Gate.io Exchange", category: "exchange", notes: "Gate.io hot wallet on ESC" },
+  { address: "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe", label: "Gate.io Exchange", category: "exchange", notes: "Gate.io cold wallet on ESC" },
+  { address: "0x517E9e5d46C1EA8aB6f78677d6114Ef47F71f6c4", label: "Wrapped ELA Contract", category: "contract", notes: "WELA (Wrapped ELA) token contract on ESC" },
   // ─── Ethereum Labels ───────────────────────────────────────────────────
   // All ELA on Ethereum is bridged from ESC via ShadowTokens (0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4)
   { address: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum. All ELA here is bridged from ESC via ShadowTokens. Flow: Main Chain → ESC Bridge → ESC → ShadowTokens → Ethereum." },

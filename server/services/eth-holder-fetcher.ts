@@ -7,6 +7,9 @@
  * 
  * Returns the same format as mainchain/ESC fetchers so the existing
  * analyzer, analytics engine, and storage pipeline work without changes.
+ * 
+ * Also returns Moralis-provided wallet labels (entity names like "Coinbase", "Uniswap", etc.)
+ * which get auto-seeded into the address_labels table.
  */
 
 import { log } from "../index";
@@ -20,14 +23,24 @@ export interface EthHolderItem {
   percentage: string;
 }
 
+/** Label data extracted from Moralis response */
+export interface MoralisLabel {
+  address: string;
+  label: string;
+  entity: string | null;
+}
+
 export interface EthHolderFetchResult {
   richlist: EthHolderItem[];
   totalSupply: number;
+  /** Labels provided by Moralis (entity names, exchange tags, etc.) */
+  labels: MoralisLabel[];
 }
 
 /**
  * Fetch top 50 ELA ERC-20 holders on Ethereum via Moralis.
  * Moralis returns holders sorted by balance descending.
+ * Also extracts owner_address_label and entity fields for auto-labeling.
  */
 export async function fetchEthElaHolders(): Promise<EthHolderFetchResult> {
   const apiKey = process.env.MORALIS_API_KEY;
@@ -67,10 +80,11 @@ export async function fetchEthElaHolders(): Promise<EthHolderFetchResult> {
 
       const items = data.result.slice(0, ETH_TOP_N);
 
-      // Build richlist and compute total
+      // Build richlist, compute total, and extract labels
       let totalSupply = 0;
+      const labels: MoralisLabel[] = [];
+
       const richlist: EthHolderItem[] = items.map((item: any) => {
-        // Moralis provides balance_formatted (human-readable) or balance (raw wei string)
         // Use parseFloat to avoid BigInt→Number precision loss for values > 2^53
         let balanceEla: number;
         if (item.balance_formatted) {
@@ -82,6 +96,17 @@ export async function fetchEthElaHolders(): Promise<EthHolderFetchResult> {
         }
 
         totalSupply += balanceEla;
+
+        // Extract Moralis-provided label data
+        const addressLabel = item.owner_address_label || null;
+        const entity = item.entity || null;
+        if (addressLabel || entity) {
+          labels.push({
+            address: item.owner_address,
+            label: addressLabel || entity,
+            entity: entity,
+          });
+        }
 
         return {
           address: item.owner_address,
@@ -96,9 +121,9 @@ export async function fetchEthElaHolders(): Promise<EthHolderFetchResult> {
         entry.percentage = totalSupply > 0 ? ((bal / totalSupply) * 100).toString() : "0";
       }
 
-      log(`ETH: Successfully fetched ${richlist.length} ELA holders, total: ${totalSupply.toFixed(2)} ELA`, "eth-holder-fetcher");
+      log(`ETH: Fetched ${richlist.length} holders, ${labels.length} with labels, total: ${totalSupply.toFixed(2)} ELA`, "eth-holder-fetcher");
 
-      return { richlist, totalSupply };
+      return { richlist, totalSupply, labels };
     } catch (error: any) {
       log(`ETH holder attempt ${attempt} failed: ${error.message}`, "eth-holder-fetcher");
 

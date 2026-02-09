@@ -348,6 +348,29 @@ async function takeEthSnapshot(): Promise<void> {
       await storage.insertConcentrationMetrics({ ...metrics, chain: "ethereum" });
     } catch { /* non-critical */ }
 
+    // Auto-seed labels from Moralis (entity names, exchange tags, etc.)
+    if (fetchResult.labels && fetchResult.labels.length > 0) {
+      let labelCount = 0;
+      for (const lbl of fetchResult.labels) {
+        try {
+          // Only upsert if we don't already have a manual label for this address
+          const existing = await storage.getAddressLabel(lbl.address);
+          if (!existing) {
+            await storage.upsertAddressLabel({
+              address: lbl.address,
+              label: lbl.label,
+              category: lbl.entity ? "exchange" : "unknown",
+              notes: lbl.entity ? `Moralis: ${lbl.entity}` : "Label from Moralis",
+            });
+            labelCount++;
+          }
+        } catch { /* non-critical */ }
+      }
+      if (labelCount > 0) {
+        log(`ETH: Auto-seeded ${labelCount} new labels from Moralis`, "scheduler");
+      }
+    }
+
     log(`ETH snapshot ${ethSnapshot.id}: ${analysis.entries.length} ELA holders`, "scheduler");
     ethFailures = 0;
     ethSkipUntil = null;

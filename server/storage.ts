@@ -136,7 +136,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getAddressHistory(address: string): Promise<Array<SnapshotEntry & { date: string; timeSlot: string }>> {
+  async getAddressHistory(address: string, chain = "mainchain"): Promise<Array<SnapshotEntry & { date: string; timeSlot: string }>> {
     const results = await db
       .select({
         id: snapshotEntries.id,
@@ -157,20 +157,28 @@ export class DatabaseStorage implements IStorage {
       })
       .from(snapshotEntries)
       .innerJoin(snapshots, eq(snapshotEntries.snapshotId, snapshots.id))
-      .where(eq(snapshotEntries.address, address))
+      .where(and(eq(snapshotEntries.address, address), eq(snapshots.chain, chain)))
       .orderBy(asc(snapshots.id));
 
     return results;
   }
 
-  async getAllUniqueAddresses(): Promise<string[]> {
-    const results = await db.selectDistinct({ address: snapshotEntries.address }).from(snapshotEntries);
-    return results.map(r => r.address);
+  async getAllUniqueAddresses(chain = "mainchain"): Promise<string[]> {
+    const results = await db.execute(sql`
+      SELECT DISTINCT se.address FROM snapshot_entries se
+      INNER JOIN snapshots s ON se.snapshot_id = s.id
+      WHERE s.chain = ${chain}
+    `);
+    return (results.rows as any[]).map(r => r.address);
   }
 
-  async getUniqueAddressCount(): Promise<number> {
-    const [{ count }] = await db.select({ count: sql<number>`count(distinct ${snapshotEntries.address})::int` }).from(snapshotEntries);
-    return count;
+  async getUniqueAddressCount(chain = "mainchain"): Promise<number> {
+    const [row] = (await db.execute(sql`
+      SELECT COUNT(DISTINCT se.address)::int AS count FROM snapshot_entries se
+      INNER JOIN snapshots s ON se.snapshot_id = s.id
+      WHERE s.chain = ${chain}
+    `)).rows as any[];
+    return row?.count ?? 0;
   }
 
   async getSnapshotCount(chain = "mainchain"): Promise<number> {
@@ -305,29 +313,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchAddresses(query: string): Promise<any[]> {
-    const allAddresses = await this.getAllUniqueAddresses();
-    const q = query.toLowerCase();
-    const matched = allAddresses.filter(a => a.toLowerCase().includes(q));
+    const q = `%${query.toLowerCase()}%`;
 
-    const labels = await this.getAllLabels();
-    const labelMap = new Map(labels.map(l => [l.address, l]));
-    const labelMatches = labels.filter(l =>
-      l.label?.toLowerCase().includes(q) || l.address.toLowerCase().includes(q)
-    ).map(l => l.address);
+    // Search directly in DB — no full table load
+    const results = await db.execute(sql`
+      SELECT DISTINCT ON (addr) addr AS address, al.label, al.category
+      FROM (
+        SELECT DISTINCT se.address AS addr
+        FROM snapshot_entries se
+        WHERE LOWER(se.address) LIKE ${q}
+        LIMIT 20
+      ) matched
+      LEFT JOIN address_labels al ON matched.addr = al.address
 
-    const combined = new Set([...matched, ...labelMatches]);
-    const results: any[] = [];
+      UNION
 
-    combined.forEach((addr) => {
-      const label = labelMap.get(addr);
-      results.push({
-        address: addr,
-        label: label?.label || null,
-        category: label?.category || null,
-      });
-    });
+      SELECT al2.address, al2.label, al2.category
+      FROM address_labels al2
+      WHERE LOWER(al2.label) LIKE ${q} OR LOWER(al2.address) LIKE ${q}
+      LIMIT 20
+    `);
 
-    return results.slice(0, 20);
+    return (results.rows as any[]).slice(0, 20);
   }
 
   async getHallOfFame(chain = "mainchain"): Promise<any[]> {
@@ -475,28 +482,31 @@ export class DatabaseStorage implements IStorage {
 
   async getSnapshotClosestTo(targetTime: Date, chain = "mainchain"): Promise<Snapshot | undefined> {
     const targetIso = targetTime.toISOString();
-    const results = await db.execute(sql`
-      SELECT * FROM snapshots
-      WHERE chain = ${chain}
-      ORDER BY ABS(EXTRACT(EPOCH FROM (fetched_at::timestamp - ${targetIso}::timestamp)))
-      LIMIT 1
-    `);
-    const row = results.rows[0] as any;
-    if (!row) return undefined;
-    return {
-      id: row.id,
-      chain: row.chain || "mainchain",
-      date: row.date,
-      timeSlot: row.time_slot,
-      fetchedAt: row.fetched_at,
-      totalBalances: row.total_balances,
-      totalRichlist: row.total_richlist,
-    };
+
+    // Use two bounded queries (indexable) instead of ABS() full-scan
+    const [before] = await db.select().from(snapshots)
+      .where(and(eq(snapshots.chain, chain), lte(snapshots.fetchedAt, targetIso)))
+      .orderBy(desc(snapshots.fetchedAt))
+      .limit(1);
+
+    const [after] = await db.select().from(snapshots)
+      .where(and(eq(snapshots.chain, chain), gte(snapshots.fetchedAt, targetIso)))
+      .orderBy(asc(snapshots.fetchedAt))
+      .limit(1);
+
+    if (!before && !after) return undefined;
+    if (!before) return after;
+    if (!after) return before;
+
+    const diffBefore = Math.abs(new Date(before.fetchedAt).getTime() - targetTime.getTime());
+    const diffAfter = Math.abs(new Date(after.fetchedAt).getTime() - targetTime.getTime());
+    return diffBefore <= diffAfter ? before : after;
   }
 
   async getRecentAddressEntries(
     address: string,
-    limit: number
+    limit: number,
+    chain = "mainchain"
   ): Promise<Array<{ rank: number; balance: number; rankStreak: number | null; balanceStreak: number | null }>> {
     const results = await db
       .select({
@@ -507,7 +517,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(snapshotEntries)
       .innerJoin(snapshots, eq(snapshotEntries.snapshotId, snapshots.id))
-      .where(eq(snapshotEntries.address, address))
+      .where(and(eq(snapshotEntries.address, address), eq(snapshots.chain, chain)))
       .orderBy(desc(snapshots.id))
       .limit(limit);
 
@@ -541,9 +551,9 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getConcentrationByDateRange(from: string, to: string): Promise<ConcentrationMetrics[]> {
+  async getConcentrationByDateRange(from: string, to: string, chain = "mainchain"): Promise<ConcentrationMetrics[]> {
     return db.select().from(concentrationMetrics)
-      .where(and(gte(concentrationMetrics.date, from), lte(concentrationMetrics.date, to)))
+      .where(and(gte(concentrationMetrics.date, from), lte(concentrationMetrics.date, to), eq(concentrationMetrics.chain, chain)))
       .orderBy(asc(concentrationMetrics.id));
   }
 
@@ -669,13 +679,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDormantWallets(chain = "mainchain"): Promise<any[]> {
-    // Find addresses with gaps between their first and last appearance in the top 100
+    // Find addresses with gaps — count actual same-chain snapshots in the span, not ID arithmetic
     const results = await db.execute(sql`
-      WITH address_snapshots AS (
+      WITH chain_snapshots AS (
+        SELECT id FROM snapshots WHERE chain = ${chain} ORDER BY id
+      ),
+      address_snapshots AS (
         SELECT
           se.address,
-          MIN(se.snapshot_id) AS first_snapshot_id,
-          MAX(se.snapshot_id) AS last_snapshot_id,
+          MIN(s.id) AS first_snapshot_id,
+          MAX(s.id) AS last_snapshot_id,
           MIN(s.date) AS first_seen,
           MAX(s.date) AS last_seen,
           COUNT(*)::int AS appearances
@@ -690,10 +703,8 @@ export class DatabaseStorage implements IStorage {
           a.first_seen,
           a.last_seen,
           a.appearances,
-          (a.last_snapshot_id - a.first_snapshot_id + 1) AS span_snapshots,
-          (a.last_snapshot_id - a.first_snapshot_id + 1) - a.appearances AS missed_snapshots
+          (SELECT COUNT(*)::int FROM chain_snapshots cs WHERE cs.id >= a.first_snapshot_id AND cs.id <= a.last_snapshot_id) AS span_snapshots
         FROM address_snapshots a
-        WHERE (a.last_snapshot_id - a.first_snapshot_id + 1) - a.appearances >= 144
       )
       SELECT
         g.address,
@@ -703,10 +714,11 @@ export class DatabaseStorage implements IStorage {
         g.last_seen,
         g.appearances,
         g.span_snapshots AS total_snapshots,
-        g.missed_snapshots
+        (g.span_snapshots - g.appearances) AS missed_snapshots
       FROM gap_analysis g
       LEFT JOIN address_labels al ON g.address = al.address
-      ORDER BY g.missed_snapshots DESC
+      WHERE (g.span_snapshots - g.appearances) >= 144
+      ORDER BY (g.span_snapshots - g.appearances) DESC
       LIMIT 50
     `);
 

@@ -71,11 +71,12 @@ export async function fetchEthElaHolders(): Promise<EthHolderFetchResult> {
       let totalSupply = 0;
       const richlist: EthHolderItem[] = items.map((item: any) => {
         // Moralis provides balance_formatted (human-readable) or balance (raw wei string)
+        // Use parseFloat to avoid BigInt→Number precision loss for values > 2^53
         let balanceEla: number;
         if (item.balance_formatted) {
           balanceEla = parseFloat(item.balance_formatted);
         } else if (item.balance) {
-          balanceEla = Number(BigInt(item.balance)) / 1e18;
+          balanceEla = parseFloat(item.balance) / 1e18;
         } else {
           balanceEla = 0;
         }

@@ -136,7 +136,8 @@ function HeaderSearch() {
     if (query.length < 3) { setResults([]); return; }
     const timeout = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const chainQ = chain !== "mainchain" ? `&chain=${chain}` : "";
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${chainQ}`);
         const data = await res.json();
         setResults(data.results || []);
         setOpen(true);

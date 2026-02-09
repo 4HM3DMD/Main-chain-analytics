@@ -47,7 +47,7 @@ export async function registerRoutes(
       }
 
       const totalSnapshots = await storage.getSnapshotCount(chain);
-      const uniqueAddresses = await storage.getUniqueAddressCount();
+      const uniqueAddresses = await storage.getUniqueAddressCount(chain);
 
       const allSnapshots = await storage.getSnapshots(1, 1, chain);
       const oldestSnapshot = allSnapshots.total > 0
@@ -107,9 +107,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/snapshots/latest", async (_req, res) => {
+  app.get("/api/snapshots/latest", async (req, res) => {
     try {
-      const snapshot = await storage.getLatestSnapshot();
+      const chain = getChain(req);
+      const snapshot = await storage.getLatestSnapshot(chain);
       if (!snapshot) return res.status(404).json({ message: "No snapshots found" });
 
       const entries = await storage.getEntriesWithLabels(snapshot.id);
@@ -154,7 +155,8 @@ export async function registerRoutes(
   app.get("/api/address/:address", async (req, res) => {
     try {
       const { address } = req.params;
-      const history = await storage.getAddressHistory(address);
+      const chain = getChain(req);
+      const history = await storage.getAddressHistory(address, chain);
 
       if (history.length === 0) {
         return res.status(404).json({ message: "Address not found in any snapshot" });
@@ -162,17 +164,18 @@ export async function registerRoutes(
 
       const label = await storage.getAddressLabel(address);
       const ranks = history.map((h) => h.rank);
-      const latestSnapshot = await storage.getLatestSnapshot();
+      const latestSnapshot = await storage.getLatestSnapshot(chain);
       const latestEntries = latestSnapshot
         ? await storage.getEntriesBySnapshotId(latestSnapshot.id)
         : [];
       const currentEntry = latestEntries.find((e) => e.address === address);
 
-      // Detect gaps (dormancy) — only count missed snapshots BETWEEN first and last appearance
-      const totalSnapshots = await storage.getSnapshotCount();
+      // Detect gaps (dormancy) — count actual same-chain snapshots in range
+      const totalSnapshots = await storage.getSnapshotCount(chain);
+      const allChainSnapshotIds = await storage.getAllSnapshotIds(chain);
       const firstSnapshotId = history[0].snapshotId;
       const lastSnapshotId = history[history.length - 1].snapshotId;
-      const spanSnapshots = lastSnapshotId - firstSnapshotId + 1;
+      const spanSnapshots = allChainSnapshotIds.filter(id => id >= firstSnapshotId && id <= lastSnapshotId).length;
       const missedSnapshots = Math.max(0, spanSnapshots - history.length);
       const hasDormancy = missedSnapshots >= 144;
 
@@ -752,14 +755,15 @@ export async function registerRoutes(
    */
   app.get("/api/analytics/concentration-history", async (req, res) => {
     try {
+      const chain = getChain(req);
       const from = req.query.from as string;
       const to = req.query.to as string;
 
       let data;
       if (from && to) {
-        data = await storage.getConcentrationByDateRange(from, to);
+        data = await storage.getConcentrationByDateRange(from, to, chain);
       } else {
-        data = (await storage.getConcentrationHistory(200)).reverse();
+        data = (await storage.getConcentrationHistory(200, chain)).reverse();
       }
 
       res.json({ data });
@@ -824,6 +828,7 @@ export async function registerRoutes(
    */
   app.get("/api/export/:type", async (req, res) => {
     try {
+      const chain = getChain(req);
       const type = req.params.type;
       const format = (req.query.format as string) || "json";
 
@@ -832,26 +837,26 @@ export async function registerRoutes(
 
       switch (type) {
         case "snapshots": {
-          const result = await storage.getSnapshots(1, 1000);
+          const result = await storage.getSnapshots(1, 1000, chain);
           data = result.snapshots;
-          filename = "snapshots";
+          filename = `snapshots-${chain}`;
           break;
         }
         case "latest": {
-          const snapshot = await storage.getLatestSnapshot();
+          const snapshot = await storage.getLatestSnapshot(chain);
           if (!snapshot) return res.status(404).json({ message: "No snapshots" });
           data = await storage.getEntriesWithLabels(snapshot.id);
-          filename = `snapshot-${snapshot.date}`;
+          filename = `snapshot-${chain}-${snapshot.date}`;
           break;
         }
         case "analytics": {
-          data = (await storage.getConcentrationHistory(1000)).reverse();
-          filename = "analytics";
+          data = (await storage.getConcentrationHistory(1000, chain)).reverse();
+          filename = `analytics-${chain}`;
           break;
         }
         case "hall-of-fame": {
-          data = await storage.getHallOfFame();
-          filename = "hall-of-fame";
+          data = await storage.getHallOfFame(chain);
+          filename = `hall-of-fame-${chain}`;
           break;
         }
         default:

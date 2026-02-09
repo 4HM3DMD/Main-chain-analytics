@@ -56,10 +56,10 @@ export async function fetchEscRichList(): Promise<EscFetchResult> {
       const items = data.items.slice(0, ESC_TOP_N);
 
       // Convert Wei to ELA and compute total
+      // Use parseFloat on string to avoid BigInt→Number precision loss for values > 2^53
       let totalSupply = 0;
       const richlist: EscRichListItem[] = items.map((item: any) => {
-        const balanceWei = BigInt(item.coin_balance || "0");
-        const balanceEla = Number(balanceWei) / 1e18;
+        const balanceEla = parseFloat(item.coin_balance || "0") / 1e18;
         totalSupply += balanceEla;
 
         return {

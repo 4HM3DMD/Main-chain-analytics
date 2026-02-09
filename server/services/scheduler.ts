@@ -32,14 +32,15 @@ export async function triggerManualSnapshot(): Promise<any> {
  */
 async function buildAddressHistoryMap(
   addresses: string[],
+  chain: string = "mainchain",
   windowSize: number = 30
 ): Promise<AddressHistoryMap> {
   const historyMap: AddressHistoryMap = {};
 
-  // Batch fetch recent entries for all current addresses
+  // Batch fetch recent entries for all current addresses — filtered by chain
   for (const address of addresses) {
     try {
-      const entries = await storage.getRecentAddressEntries(address, windowSize);
+      const entries = await storage.getRecentAddressEntries(address, windowSize, chain);
       if (entries.length > 0) {
         historyMap[address] = entries;
       }
@@ -186,7 +187,8 @@ async function computeWeeklySummary(): Promise<void> {
 
     log(`Computing weekly summary for ${weekStart} to ${weekEnd}`, "scheduler");
 
-    const metrics = await storage.getConcentrationByDateRange(weekStart, weekEnd);
+    // Only compute weekly summary for mainchain (weekly_summary table has no chain column)
+    const metrics = await storage.getConcentrationByDateRange(weekStart, weekEnd, "mainchain");
     if (metrics.length === 0) {
       log("No concentration metrics found for the week, skipping", "scheduler");
       return;
@@ -202,7 +204,7 @@ async function computeWeeklySummary(): Promise<void> {
     const avgVolatility = metrics.reduce((s, m) => s + (m.avgRankChange || 0), 0) / metrics.length;
 
     // Find top accumulator/distributor from movers endpoint logic
-    const moverData = await storage.getMovers(weekStart, weekEnd);
+    const moverData = await storage.getMovers(weekStart, weekEnd, "mainchain");
 
     await storage.upsertWeeklySummary({
       weekStart,
@@ -263,17 +265,11 @@ async function takeEscSnapshot(): Promise<void> {
       throw err;
     }
 
-    // Build address history for ESC analytics
+    // Build address history for ESC analytics — filtered to ESC chain only
     let escAddressHistory: AddressHistoryMap | undefined;
     try {
       const addrs = fetchResult.richlist.map(r => r.address);
-      escAddressHistory = {};
-      for (const addr of addrs) {
-        try {
-          const entries = await storage.getRecentAddressEntries(addr, 30);
-          if (entries.length > 0) escAddressHistory[addr] = entries;
-        } catch { /* skip */ }
-      }
+      escAddressHistory = await buildAddressHistoryMap(addrs, "esc");
     } catch { /* non-critical */ }
 
     const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, escSnapshot.id, escAddressHistory);
@@ -335,17 +331,11 @@ async function takeEthSnapshot(): Promise<void> {
       throw err;
     }
 
-    // Build address history for Ethereum analytics
+    // Build address history for Ethereum analytics — filtered to ethereum chain only
     let ethAddressHistory: AddressHistoryMap | undefined;
     try {
       const addrs = fetchResult.richlist.map(r => r.address);
-      ethAddressHistory = {};
-      for (const addr of addrs) {
-        try {
-          const entries = await storage.getRecentAddressEntries(addr, 30);
-          if (entries.length > 0) ethAddressHistory[addr] = entries;
-        } catch { /* skip */ }
-      }
+      ethAddressHistory = await buildAddressHistoryMap(addrs, "ethereum");
     } catch { /* non-critical */ }
 
     const analysis = analyzeSnapshot(fetchResult.richlist, prevEntries, ethSnapshot.id, ethAddressHistory);

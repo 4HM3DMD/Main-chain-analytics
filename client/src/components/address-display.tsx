@@ -3,8 +3,7 @@ import { useState } from "react";
 import { truncateAddress, getCategoryColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-const EXPLORER_URL = "https://blockchain.elastos.io/address";
+import { useChain } from "@/lib/chain-context";
 
 interface AddressDisplayProps {
   address: string;
@@ -16,6 +15,7 @@ interface AddressDisplayProps {
 }
 
 export function AddressDisplay({ address, label, category, truncate = true, showCopy = true, showExplorer = false }: AddressDisplayProps) {
+  const { chainInfo } = useChain();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -44,7 +44,7 @@ export function AddressDisplay({ address, label, category, truncate = true, show
         </Button>
       )}
       {showExplorer && (
-        <a href={`${EXPLORER_URL}/${address}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+        <a href={`${chainInfo.explorerUrl}/${address}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
           <Button variant="ghost" size="icon" className="shrink-0 w-6 h-6">
             <ExternalLink className="w-3 h-3" />
           </Button>

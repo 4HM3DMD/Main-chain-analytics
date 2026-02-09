@@ -275,7 +275,7 @@ export default function AddressDetail() {
               <LineChart data={rankData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis reversed domain={[1, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis reversed domain={[1, topN]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--muted-foreground))" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
@@ -443,7 +443,7 @@ function RecentTransactions({ address }: { address: string }) {
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
   const { data, isLoading, error } = useQuery<TxData>({
-    queryKey: ["/api/address", address, `/transactions${chainSuffix ? `?${chainSuffix}` : ""}`],
+    queryKey: ["/api/address", address, `transactions${chainSuffix ? `?${chainSuffix}` : ""}`],
   });
 
   if (error) return null; // Silently fail — blockchain API might be down

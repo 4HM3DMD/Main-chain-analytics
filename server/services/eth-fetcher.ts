@@ -51,8 +51,7 @@ export async function fetchEthElaSupply(): Promise<EthSupplyResult> {
     const data = await response.json();
     if (data.status !== "1") throw new Error(`Etherscan: ${data.message}`);
 
-    const supplyWei = BigInt(data.result || "0");
-    const supplyEla = Number(supplyWei) / 1e18;
+    const supplyEla = parseFloat(data.result || "0") / 1e18;
 
     return { totalSupply: supplyEla, contractAddress: ELA_ETH_CONTRACT };
   } catch (error: any) {

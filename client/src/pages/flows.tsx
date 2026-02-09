@@ -83,29 +83,6 @@ export default function Flows() {
   const topN = chainInfo.topN;
   const chainSuffix = chain !== "mainchain" ? `chain=${chain}` : "";
 
-  // Check if flows analysis is supported for this chain
-  if (!chainInfo.hasSnapshots) {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="text-center max-w-md space-y-4">
-          <Activity className="w-12 h-12 text-muted-foreground mx-auto" />
-          <h2 className="text-lg font-semibold">
-            Flow Analysis Not Available for {chainInfo.name}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {chainInfo.name} does not have richlist snapshots, so flow tracking is not available.
-            Visit the dashboard to see supply and transfer data.
-          </p>
-          <Link href={`/${chain}`}>
-            <Button variant="outline">
-              View {chainInfo.shortName} Dashboard
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const { data, isLoading } = useQuery<FlowsData>({
     queryKey: ["/api/flows", ...(chainSuffix ? [`?${chainSuffix}`] : [])],
     refetchInterval: 300000,
@@ -125,7 +102,7 @@ export default function Flows() {
   const concentrationData = [
     { name: "Top 10", percentage: data.concentration.top10.percentage, balance: data.concentration.top10.balance },
     { name: "Top 11-20", percentage: data.concentration.top20.percentage - data.concentration.top10.percentage, balance: data.concentration.top20.balance - data.concentration.top10.balance },
-    { name: "Top 21-100", percentage: 100 - data.concentration.top20.percentage, balance: data.concentration.top100.balance - data.concentration.top20.balance },
+    { name: `Top 21-${topN}`, percentage: 100 - data.concentration.top20.percentage, balance: data.concentration.top100.balance - data.concentration.top20.balance },
   ];
 
   const concentrationPieData = concentrationData.map((d, i) => ({

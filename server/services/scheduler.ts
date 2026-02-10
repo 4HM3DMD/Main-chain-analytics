@@ -300,6 +300,10 @@ async function takeEscSnapshot(): Promise<void> {
 let ethFailures = 0;
 let ethSkipUntil: Date | null = null;
 
+// Cache of addresses we've already checked for labels (resets daily)
+let labelCache = new Set<string>();
+let lastLabelCacheReset = getTodayDate();
+
 async function takeEthSnapshot(): Promise<void> {
   // Skip if no MORALIS_API_KEY configured
   if (!process.env.MORALIS_API_KEY) return;
@@ -349,26 +353,44 @@ async function takeEthSnapshot(): Promise<void> {
     } catch { /* non-critical */ }
 
     // Auto-seed labels from Moralis (entity names, exchange tags, etc.)
+    // Reset cache daily to catch label updates
+    const currentDate = getTodayDate();
+    if (currentDate !== lastLabelCacheReset) {
+      labelCache.clear();
+      lastLabelCacheReset = currentDate;
+      log(`ETH: Label cache reset for new day`, "scheduler");
+    }
+
+    // Only process labels we haven't seen yet today
     if (fetchResult.labels && fetchResult.labels.length > 0) {
-      let labelCount = 0;
-      for (const lbl of fetchResult.labels) {
-        try {
-          // Only upsert if we don't already have a manual label for this address
-          const existing = await storage.getAddressLabel(lbl.address);
-          if (!existing) {
-            await storage.upsertAddressLabel({
-              address: lbl.address,
-              label: lbl.label,
-              category: lbl.entity ? "exchange" : "unknown",
-              notes: lbl.entity ? `Moralis: ${lbl.entity}` : "Label from Moralis",
-            });
-            labelCount++;
-          }
-        } catch { /* non-critical */ }
+      const newLabels = fetchResult.labels.filter(lbl => !labelCache.has(lbl.address));
+      
+      if (newLabels.length > 0) {
+        let labelCount = 0;
+        for (const lbl of newLabels) {
+          try {
+            // Only upsert if we don't already have a manual label for this address
+            const existing = await storage.getAddressLabel(lbl.address);
+            if (!existing) {
+              await storage.upsertAddressLabel({
+                address: lbl.address,
+                label: lbl.label,
+                category: lbl.entity ? "exchange" : "unknown",
+                notes: lbl.entity ? `Moralis: ${lbl.entity}` : "Label from Moralis",
+              });
+              labelCount++;
+            }
+            // Mark as checked regardless of whether we saved it
+            labelCache.add(lbl.address);
+          } catch { /* non-critical */ }
+        }
+        if (labelCount > 0) {
+          log(`ETH: Auto-seeded ${labelCount} new labels from Moralis`, "scheduler");
+        }
       }
-      if (labelCount > 0) {
-        log(`ETH: Auto-seeded ${labelCount} new labels from Moralis`, "scheduler");
-      }
+      
+      // Also mark addresses without labels as checked
+      fetchResult.richlist.forEach(holder => labelCache.add(holder.address));
     }
 
     log(`ETH snapshot ${ethSnapshot.id}: ${analysis.entries.length} ELA holders`, "scheduler");

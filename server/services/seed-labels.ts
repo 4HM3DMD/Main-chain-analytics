@@ -38,6 +38,10 @@ const KNOWN_ADDRESSES = [
   // ─── Ethereum Labels ───────────────────────────────────────────────────
   // All ELA on Ethereum is bridged from ESC via ShadowTokens (0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4)
   { address: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum. All ELA here is bridged from ESC via ShadowTokens. Flow: Main Chain → ESC Bridge → ESC → ShadowTokens → Ethereum." },
+  { address: "0x2291B0227314Ed24B8b768e3E755C88bD077d4Ea", label: "Coinbase Prime Custody", category: "exchange", notes: "Coinbase institutional custody service" },
+  { address: "0x5047b7ad7c2d52491f0b01d41ccd8beed447bf91", label: "Coinbase Prime Custody", category: "exchange", notes: "Coinbase institutional custody service" },
+  { address: "0x412940FDaC1214Fc3Df430769F54e69210A18e49", label: "Uniswap ELA Pool", category: "dex", notes: "Uniswap decentralized exchange liquidity pool for ELA" },
+  { address: "0xD00486207705F54f4BAc843769D0f6D12A4bf9d4", label: "MultiSig Wallet Proxy", category: "contract", notes: "MultiSigWalletImplementation proxy contract" },
 ];
 
 // Addresses to remove (temporarily unlabeled)

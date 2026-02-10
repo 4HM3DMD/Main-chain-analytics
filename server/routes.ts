@@ -918,58 +918,239 @@ export async function registerRoutes(
 
   /**
    * GET /api/cross-chain/summary
-   * Unified view across all 3 chains: Main, ESC, Ethereum.
-   * Shows supply flow, category breakdown, and who's accumulating/distributing.
+   * 🧠 Intelligent Cross-Chain Analytics (Arkham-style)
+   * Provides actionable insights, entity behavior, flow intelligence, and risk signals
    */
   app.get("/api/cross-chain/summary", async (_req, res) => {
     try {
       const chains = ["mainchain", "esc", "ethereum"] as const;
       
-      // Fetch latest snapshot + metrics from each chain
+      // Fetch latest snapshot + metrics + 7-day history from each chain
       const chainData = await Promise.all(
         chains.map(async (chain) => {
           const snapshot = await storage.getLatestSnapshot(chain);
-          if (!snapshot) return { chain, snapshot: null, entries: [], metrics: null };
+          if (!snapshot) return { chain, snapshot: null, entries: [], metrics: null, history: [] };
 
           const entries = await storage.getEntriesWithLabels(snapshot.id);
           const metrics = await storage.getLatestConcentrationMetrics(chain);
+          
+          // Fetch 7-day metrics history for trend analysis
+          const history = await storage.getConcentrationHistory(168, chain); // 7 days of 5-min snapshots
 
-          return { chain, snapshot, entries, metrics };
+          return { chain, snapshot, entries, metrics, history };
         })
       );
 
-      // Compute category breakdown per chain
-      const categoryBreakdown: Record<string, { mainchain: number; esc: number; ethereum: number; total: number }> = {};
+      // ═══════════════════════════════════════════════════════════════════════════
+      // 🧠 INTELLIGENT INSIGHTS ENGINE
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      const insights: Array<{
+        severity: "critical" | "warning" | "info" | "positive";
+        category: string;
+        title: string;
+        description: string;
+        metric?: string;
+      }> = [];
+
+      // ─── Entity Behavior Analysis ────────────────────────────────────────────
+      
+      // Track exchange behavior across all chains
+      const exchangeMovements = chainData.flatMap(cd =>
+        cd.entries
+          .filter(e => e.category === "exchange" && e.balanceChange !== null && Math.abs(e.balanceChange) > 1000)
+          .map(e => ({ chain: cd.chain, label: e.label, change: e.balanceChange!, balance: e.balance }))
+      );
+
+      const exchangeAccumulating = exchangeMovements.filter(e => e.change > 0).reduce((s, e) => s + e.change, 0);
+      const exchangeDistributing = Math.abs(exchangeMovements.filter(e => e.change < 0).reduce((s, e) => s + e.change, 0));
+
+      if (exchangeAccumulating > exchangeDistributing * 1.5 && exchangeAccumulating > 5000) {
+        insights.push({
+          severity: "warning",
+          category: "Exchange Behavior",
+          title: "Heavy Exchange Accumulation",
+          description: `Exchanges are net accumulating ${(exchangeAccumulating - exchangeDistributing).toFixed(0)} ELA across all chains. May indicate reduced retail selling pressure or institutional buying.`,
+          metric: `+${exchangeAccumulating.toFixed(0)} ELA`,
+        });
+      } else if (exchangeDistributing > exchangeAccumulating * 1.5 && exchangeDistributing > 5000) {
+        insights.push({
+          severity: "critical",
+          category: "Exchange Behavior",
+          title: "Heavy Exchange Distribution",
+          description: `Exchanges are net distributing ${(exchangeDistributing - exchangeAccumulating).toFixed(0)} ELA. May signal incoming sell pressure or withdrawals to cold storage.`,
+          metric: `-${exchangeDistributing.toFixed(0)} ELA`,
+        });
+      }
+
+      // ─── Bridge Health Monitoring ──────────────────────────────────────────────
+      
+      const escBridgeEntry = chainData[0].entries.find(e => e.address === "XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf");
+      const escBridgeBalance = escBridgeEntry?.balance || 0;
+      const escBridgeChange = escBridgeEntry?.balanceChange || 0;
+      
+      const shadowBridgeEntry = chainData[1].entries.find(e => e.address === "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4");
+      const shadowBridgeBalance = shadowBridgeEntry?.balance || 0;
+      const shadowBridgeChange = shadowBridgeEntry?.balanceChange || 0;
+
+      // Detect abnormal bridge flows
+      if (Math.abs(escBridgeChange) > 10000) {
+        insights.push({
+          severity: escBridgeChange > 0 ? "info" : "warning",
+          category: "Bridge Activity",
+          title: escBridgeChange > 0 ? "Main→ESC Bridge Inflow" : "Main→ESC Bridge Outflow",
+          description: `${Math.abs(escBridgeChange).toFixed(0)} ELA ${escBridgeChange > 0 ? "bridged TO" : "bridged FROM"} ESC. Current bridge balance: ${escBridgeBalance.toFixed(0)} ELA.`,
+          metric: `${escBridgeChange > 0 ? "+" : ""}${escBridgeChange.toFixed(0)} ELA`,
+        });
+      }
+
+      if (Math.abs(shadowBridgeChange) > 5000) {
+        insights.push({
+          severity: shadowBridgeChange > 0 ? "info" : "warning",
+          category: "Bridge Activity",
+          title: shadowBridgeChange > 0 ? "ESC→ETH Bridge Inflow" : "ESC→ETH Bridge Outflow",
+          description: `${Math.abs(shadowBridgeChange).toFixed(0)} ELA ${shadowBridgeChange > 0 ? "bridged TO" : "bridged FROM"} Ethereum via ShadowTokens. Current: ${shadowBridgeBalance.toFixed(0)} ELA.`,
+          metric: `${shadowBridgeChange > 0 ? "+" : ""}${shadowBridgeChange.toFixed(0)} ELA`,
+        });
+      }
+
+      // ─── Concentration Risk Analysis ──────────────────────────────────────────
+      
+      for (const cd of chainData) {
+        if (!cd.metrics) continue;
+        
+        const gini = cd.metrics.giniCoefficient;
+        const wai = cd.metrics.whaleActivityIndex;
+        
+        // Critical concentration threshold
+        if (gini && gini > 0.85) {
+          insights.push({
+            severity: "critical",
+            category: "Concentration Risk",
+            title: `Extreme Concentration on ${cd.chain === "mainchain" ? "Main Chain" : cd.chain.toUpperCase()}`,
+            description: `Gini coefficient of ${gini.toFixed(3)} indicates top wallets control vast majority of supply. Centralization risk.`,
+            metric: `Gini ${gini.toFixed(3)}`,
+          });
+        }
+
+        // Whale activity spike
+        if (wai && wai > 75) {
+          insights.push({
+            severity: "warning",
+            category: "Whale Activity",
+            title: `High Whale Activity on ${cd.chain === "mainchain" ? "Main Chain" : cd.chain.toUpperCase()}`,
+            description: `WAI of ${wai.toFixed(1)} indicates significant top-10 movement. Monitor for potential volatility.`,
+            metric: `WAI ${wai.toFixed(1)}`,
+          });
+        }
+      }
+
+      // ─── 7-Day Trend Analysis ────────────────────────────────────────────────
+      
+      for (const cd of chainData) {
+        if (cd.history.length < 50) continue; // Need at least 50 snapshots for trend
+        
+        const recent = cd.history.slice(-20);
+        const week = cd.history.slice(0, 20);
+        
+        const avgGiniRecent = recent.reduce((s, m) => s + (m.giniCoefficient || 0), 0) / recent.length;
+        const avgGiniWeek = week.reduce((s, m) => s + (m.giniCoefficient || 0), 0) / week.length;
+        const giniChange = ((avgGiniRecent - avgGiniWeek) / avgGiniWeek) * 100;
+
+        if (Math.abs(giniChange) > 2) { // >2% change in Gini
+          insights.push({
+            severity: giniChange > 0 ? "warning" : "positive",
+            category: "Trend Analysis",
+            title: `${cd.chain.toUpperCase()}: ${giniChange > 0 ? "Increasing" : "Decreasing"} Concentration`,
+            description: `Gini ${giniChange > 0 ? "up" : "down"} ${Math.abs(giniChange).toFixed(1)}% over 7 days. ${giniChange > 0 ? "Supply becoming more centralized." : "Supply distributing to more wallets."}`,
+            metric: `${giniChange > 0 ? "+" : ""}${giniChange.toFixed(1)}%`,
+          });
+        }
+      }
+
+      // ─── Smart Entity Flow Tracking ───────────────────────────────────────────
+      
+      type EntityFlow = {
+        entity: string;
+        category: string;
+        chains: { mainchain?: number; esc?: number; ethereum?: number };
+        total: number;
+        netChange: number;
+      };
+
+      const entityFlowsMap: Record<string, EntityFlow> = {};
+
+      for (const cd of chainData) {
+        for (const entry of cd.entries) {
+          if (!entry.label || entry.balanceChange === null || Math.abs(entry.balanceChange) < 500) continue;
+          
+          const key = entry.label;
+          if (!entityFlowsMap[key]) {
+            entityFlowsMap[key] = {
+              entity: entry.label,
+              category: entry.category || "unknown",
+              chains: {},
+              total: 0,
+              netChange: 0,
+            };
+          }
+          
+          const chainKey = cd.chain as "mainchain" | "esc" | "ethereum";
+          entityFlowsMap[key].chains[chainKey] = (entityFlowsMap[key].chains[chainKey] || 0) + entry.balance;
+          entityFlowsMap[key].total += entry.balance;
+          entityFlowsMap[key].netChange += entry.balanceChange;
+        }
+      }
+
+      const topEntityFlows = Object.values(entityFlowsMap)
+        .sort((a, b) => Math.abs(b.netChange) - Math.abs(a.netChange))
+        .slice(0, 10);
+
+      // ─── Risk Signals ──────────────────────────────────────────────────────────
+      
+      // Detect if any single entity controls >5% across all chains
+      const totalSupply = chainData.reduce((s, cd) => s + cd.entries.reduce((t, e) => t + e.balance, 0), 0);
+      const dangerousEntities = Object.values(entityFlowsMap).filter(e => (e.total / totalSupply) > 0.05);
+
+      if (dangerousEntities.length > 0) {
+        dangerousEntities.forEach(ent => {
+          insights.push({
+            severity: "warning",
+            category: "Risk Signal",
+            title: `High Single-Entity Exposure: ${ent.entity}`,
+            description: `${ent.entity} controls ${((ent.total / totalSupply) * 100).toFixed(1)}% of tracked supply across all chains. Concentration risk.`,
+            metric: `${((ent.total / totalSupply) * 100).toFixed(1)}%`,
+          });
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // 📊 TRADITIONAL METRICS (Enhanced)
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      const categoryBreakdown: Record<string, { mainchain: number; esc: number; ethereum: number; total: number; change24h: number }> = {};
       
       for (const cd of chainData) {
         for (const entry of cd.entries) {
           const cat = entry.category || "unknown";
           if (!categoryBreakdown[cat]) {
-            categoryBreakdown[cat] = { mainchain: 0, esc: 0, ethereum: 0, total: 0 };
+            categoryBreakdown[cat] = { mainchain: 0, esc: 0, ethereum: 0, total: 0, change24h: 0 };
           }
           categoryBreakdown[cat][cd.chain] += entry.balance;
           categoryBreakdown[cat].total += entry.balance;
+          if (entry.balanceChange) {
+            categoryBreakdown[cat].change24h += entry.balanceChange;
+          }
         }
       }
 
-      // Supply flow (Main → ESC → ETH)
       const mainBalance = chainData[0].entries.reduce((s, e) => s + e.balance, 0);
       const escBalance = chainData[1].entries.reduce((s, e) => s + e.balance, 0);
       const ethBalance = chainData[2].entries.reduce((s, e) => s + e.balance, 0);
-      
-      // ESC bridge address on mainchain
-      const escBridgeEntry = chainData[0].entries.find(e => e.address === "XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf");
-      const escBridgeBalance = escBridgeEntry?.balance || 0;
 
-      // ShadowTokens bridge on ESC
-      const shadowBridgeEntry = chainData[1].entries.find(e => e.address === "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4");
-      const shadowBridgeBalance = shadowBridgeEntry?.balance || 0;
-
-      // Top accumulators/distributors across all chains (from latest snapshots)
-      const allMovers: Array<{chain: string; address: string; label: string | null; balanceChange: number; category: string | null}> = [];
-      
-      for (const cd of chainData) {
-        const movers = cd.entries
+      // Top movers with enhanced context
+      const allMovers = chainData.flatMap(cd =>
+        cd.entries
           .filter(e => e.balanceChange !== null && e.balanceChange !== 0)
           .map(e => ({
             chain: cd.chain,
@@ -977,31 +1158,44 @@ export async function registerRoutes(
             label: e.label,
             balanceChange: e.balanceChange!,
             category: e.category,
-          }));
-        allMovers.push(...movers);
-      }
+            balance: e.balance,
+            percentOfChain: (e.balance / cd.entries.reduce((s, x) => s + x.balance, 0)) * 100,
+          }))
+      );
 
-      // Sort by absolute change
       allMovers.sort((a, b) => Math.abs(b.balanceChange) - Math.abs(a.balanceChange));
-      const topAccumulators = allMovers.filter(m => m.balanceChange > 0).slice(0, 5);
-      const topDistributors = allMovers.filter(m => m.balanceChange < 0).slice(0, 5);
+      const topAccumulators = allMovers.filter(m => m.balanceChange > 0).slice(0, 8);
+      const topDistributors = allMovers.filter(m => m.balanceChange < 0).slice(0, 8);
 
-      // Chain health metrics
       const chainHealth = chainData.map(cd => ({
         chain: cd.chain,
         gini: cd.metrics?.giniCoefficient ?? null,
         wai: cd.metrics?.whaleActivityIndex ?? null,
         activeWallets: cd.metrics?.activeWallets ?? null,
-        netFlow24h: cd.metrics?.netFlow ?? null, // This is actually per-snapshot, not 24h
+        netFlow24h: cd.metrics?.netFlow ?? null,
         totalBalance: cd.entries.reduce((s, e) => s + e.balance, 0),
+        // 7-day trend indicators
+        giniTrend7d: cd.history.length > 20 ? ((cd.history[cd.history.length - 1].giniCoefficient || 0) - (cd.history[0].giniCoefficient || 0)) : null,
+        waiTrend7d: cd.history.length > 20 ? ((cd.history[cd.history.length - 1].whaleActivityIndex || 0) - (cd.history[0].whaleActivityIndex || 0)) : null,
       }));
 
+      // Sort insights: critical → warning → positive → info
+      const severityOrder = { critical: 0, warning: 1, positive: 2, info: 3 };
+      insights.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
       res.json({
+        // 🧠 Intelligence Layer
+        insights: insights.slice(0, 12), // Top 12 most important insights
+        entityFlows: topEntityFlows,
+        
+        // 📊 Enhanced Metrics
         supplyFlow: {
           mainchainTopN: mainBalance,
           escBridgeOnMain: escBridgeBalance,
+          escBridgeChange: escBridgeChange,
           escTopN: escBalance,
           shadowBridgeOnEsc: shadowBridgeBalance,
+          shadowBridgeChange: shadowBridgeChange,
           ethTopN: ethBalance,
         },
         categoryBreakdown: Object.entries(categoryBreakdown)

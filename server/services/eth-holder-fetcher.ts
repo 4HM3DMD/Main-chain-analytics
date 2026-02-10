@@ -100,16 +100,18 @@ export async function fetchEthElaHolders(): Promise<EthHolderFetchResult> {
         // Extract Moralis-provided label data
         const addressLabel = item.owner_address_label || null;
         const entity = item.entity || null;
+        const normalizedAddress = (item.owner_address || "").toLowerCase();
+        
         if (addressLabel || entity) {
           labels.push({
-            address: item.owner_address,
+            address: normalizedAddress,
             label: addressLabel || entity,
             entity: entity,
           });
         }
 
         return {
-          address: item.owner_address,
+          address: normalizedAddress,
           balance: balanceEla.toString(),
           percentage: "0", // Compute after total is known
         };

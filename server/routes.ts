@@ -36,6 +36,16 @@ export async function registerRoutes(
     }
   });
 
+  // Manual label reseed endpoint
+  app.post("/api/admin/reseed-labels", async (_req, res) => {
+    try {
+      await seedAddressLabels();
+      res.json({ success: true, message: "Address labels reseeded successfully" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
   app.get("/api/dashboard", async (req, res) => {
     try {
       const chain = getChain(req);
@@ -989,7 +999,8 @@ export async function registerRoutes(
       const escBridgeBalance = escBridgeEntry?.balance || 0;
       const escBridgeChange = escBridgeEntry?.balanceChange || 0;
       
-      const shadowBridgeEntry = chainData[1].entries.find(e => e.address === "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4");
+      // Note: ESC/ETH addresses normalized to lowercase
+      const shadowBridgeEntry = chainData[1].entries.find(e => e.address === "0xe235cbc85e26824e4d855d4d0ac80f3a85a520e4");
       const shadowBridgeBalance = shadowBridgeEntry?.balance || 0;
       const shadowBridgeChange = shadowBridgeEntry?.balanceChange || 0;
 

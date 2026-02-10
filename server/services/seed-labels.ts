@@ -31,17 +31,19 @@ const KNOWN_ADDRESSES = [
   // ─── ESC (Elastos Smart Chain) Labels ───────────────────────────────────
   // These are 0x addresses — never collide with mainchain addresses
   // All ELA on ESC originates from mainchain's XVbCTM7vqM1qHKsABSFH4xKN1qbp7ijpWf (ESC Sidechain Transfer)
-  { address: "0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4", label: "ShadowTokens Bridge (ETH Proxy)", category: "sidechain", notes: "ShadowTokens bridge contract — all ELA bridged to Ethereum goes through this address. Source of all ELA ERC-20 on Ethereum." },
-  { address: "0xC882b111A75C0c657fC507C04FbFcD2cC984F071", label: "Gate.io Exchange", category: "exchange", notes: "Gate.io hot wallet on ESC" },
-  { address: "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe", label: "Gate.io Exchange", category: "exchange", notes: "Gate.io cold wallet on ESC" },
-  { address: "0x517E9e5d46C1EA8aB6f78677d6114Ef47F71f6c4", label: "Wrapped ELA Contract", category: "contract", notes: "WELA (Wrapped ELA) token contract on ESC" },
+  // Note: All 0x addresses stored in lowercase for case-insensitive matching
+  { address: "0xe235cbc85e26824e4d855d4d0ac80f3a85a520e4", label: "ShadowTokens Bridge (ETH Proxy)", category: "sidechain", notes: "ShadowTokens bridge contract — all ELA bridged to Ethereum goes through this address. Source of all ELA ERC-20 on Ethereum." },
+  { address: "0xc882b111a75c0c657fc507c04fbfcd2cc984f071", label: "Gate.io Exchange", category: "exchange", notes: "Gate.io hot wallet on ESC" },
+  { address: "0x0d0707963952f2fba59dd06f2b425ace40b492fe", label: "Gate.io Exchange", category: "exchange", notes: "Gate.io cold wallet on ESC" },
+  { address: "0x517e9e5d46c1ea8ab6f78677d6114ef47f71f6c4", label: "Wrapped ELA Contract", category: "contract", notes: "WELA (Wrapped ELA) token contract on ESC" },
   // ─── Ethereum Labels ───────────────────────────────────────────────────
   // All ELA on Ethereum is bridged from ESC via ShadowTokens (0xE235CbC85e26824E4D855d4d0ac80f3A85A520E4)
-  { address: "0xe6fd75ff38Adca4B97FBCD938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum. All ELA here is bridged from ESC via ShadowTokens. Flow: Main Chain → ESC Bridge → ESC → ShadowTokens → Ethereum." },
-  { address: "0x2291B0227314Ed24B8b768e3E755C88bD077d4Ea", label: "Coinbase Prime Custody", category: "exchange", notes: "Coinbase institutional custody service" },
+  // Note: Ethereum addresses stored in lowercase for case-insensitive matching
+  { address: "0xe6fd75ff38adca4b97fbcd938c86b98772431867", label: "ELA ERC-20 Contract", category: "sidechain", notes: "ELA token contract on Ethereum. All ELA here is bridged from ESC via ShadowTokens. Flow: Main Chain → ESC Bridge → ESC → ShadowTokens → Ethereum." },
+  { address: "0x2291b0227314ed24b8b768e3e755c88bd077d4ea", label: "Coinbase Prime Custody", category: "exchange", notes: "Coinbase institutional custody service" },
   { address: "0x5047b7ad7c2d52491f0b01d41ccd8beed447bf91", label: "Coinbase Prime Custody", category: "exchange", notes: "Coinbase institutional custody service" },
-  { address: "0x412940FDaC1214Fc3Df430769F54e69210A18e49", label: "Uniswap ELA Pool", category: "dex", notes: "Uniswap decentralized exchange liquidity pool for ELA" },
-  { address: "0xD00486207705F54f4BAc843769D0f6D12A4bf9d4", label: "MultiSig Wallet Proxy", category: "contract", notes: "MultiSigWalletImplementation proxy contract" },
+  { address: "0x412940fdac1214fc3df430769f54e69210a18e49", label: "Uniswap ELA Pool", category: "dex", notes: "Uniswap decentralized exchange liquidity pool for ELA" },
+  { address: "0xd00486207705f54f4bac843769d0f6d12a4bf9d4", label: "MultiSig Wallet Proxy", category: "contract", notes: "MultiSigWalletImplementation proxy contract" },
 ];
 
 // Addresses to remove (temporarily unlabeled)

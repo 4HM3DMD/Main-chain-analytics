@@ -63,7 +63,7 @@ export async function fetchEscRichList(): Promise<EscFetchResult> {
         totalSupply += balanceEla;
 
         return {
-          address: item.hash,
+          address: (item.hash || "").toLowerCase(), // Normalize to lowercase
           balance: balanceEla.toString(),
           percentage: "0", // Will compute after we have total
         };
